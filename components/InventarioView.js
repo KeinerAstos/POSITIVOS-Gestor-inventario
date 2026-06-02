@@ -506,7 +506,7 @@ function InventarioView({ bodegas, inv, materiales, ots, setView, setTransferIte
                 React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse', minWidth: 1100 } },
                     React.createElement('thead', null,
                         React.createElement('tr', null,
-                            ['Material', 'Nº Serie', 'Doc. Material', 'OTH', 'Lote', 'Cant.', 'Ubicación', 'Bodega', 'Estado', 'OT Asociada', 'Acción'].map(h =>
+                            ['Cantidad', 'Material', 'Descripción', 'Nº Serie', 'Doc. Material', 'OT Asociada (OTP)', 'OTH', 'Lote', 'Ubicación', 'Estado', 'Acción'].map(h =>
                                 React.createElement('th', { key: h, style: TH }, h)
                             )
                         )
@@ -530,20 +530,21 @@ function InventarioView({ bodegas, inv, materiales, ots, setView, setTransferIte
                                     case 'DEVUELTO': estadoColor = '#757575'; estadoLabel = '🔄 Devuelto'; break;
                                 }
                                 return React.createElement('tr', { key: item.id, style: { borderBottom: '1px solid var(--border)' } },
+                                    // 1. Cantidad
+                                    React.createElement('td', { style: { ...TD, textAlign: 'center' } }, item.cantidad),
+                                    // 2. Material (código)
+                                    React.createElement('td', { style: TD }, item.material_id),
+                                    // 3. Descripción
+                                    React.createElement('td', { style: TD }, item.material_descripcion || '—'),
+                                    // 4. Nº Serie
                                     React.createElement('td', { style: TD },
-                                        React.createElement('div', { style: { fontWeight: '500' } }, item.descripcion || item.material_id),
-                                        React.createElement('div', { style: { fontSize: 11, color: 'var(--text-secondary)' } }, item.material_id)
+                                        item.serial ?
+                                            React.createElement('code', { style: { background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 4, fontSize: 11 } }, item.serial) :
+                                            React.createElement('span', { style: { color: 'var(--text-secondary)', fontStyle: 'italic' } }, '—')
                                     ),
-                                    React.createElement('td', { style: TD }, item.serial ? React.createElement('code', { style: { background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 4, fontSize: 11 } }, item.serial) : React.createElement('span', { style: { color: 'var(--text-secondary)', fontStyle: 'italic' } }, '—')),
+                                    // 5. Doc. Material
                                     React.createElement('td', { style: TD }, item.documento_material || '—'),
-                                    React.createElement('td', { style: TD }, item.oth || '—'),
-                                    React.createElement('td', { style: TD }, item.lote || '—'),
-                                    React.createElement('td', { style: TD, textAlign: 'center' }, item.cantidad),
-                                    React.createElement('td', { style: TD }, item.ubicacion || '—'),
-                                    React.createElement('td', { style: TD }, getBod(item.bodega_id)),
-                                    React.createElement('td', { style: TD },
-                                        React.createElement('span', { style: { display: 'inline-block', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500, background: estadoColor + '20', color: estadoColor } }, estadoLabel)
-                                    ),
+                                    // 6. OT Asociada (OTP)
                                     React.createElement('td', { style: TD },
                                         item.numero_ot ?
                                             React.createElement('span', { style: { background: 'var(--bg-secondary)', padding: '2px 8px', borderRadius: 12, fontSize: 11 } },
@@ -551,6 +552,27 @@ function InventarioView({ bodegas, inv, materiales, ots, setView, setTransferIte
                                             ) :
                                             React.createElement('span', { style: { color: 'var(--text-secondary)', fontSize: 12, fontStyle: 'italic' } }, '—')
                                     ),
+                                    // 7. OTH
+                                    React.createElement('td', { style: TD }, item.oth || '—'),
+                                    // 8. Lote
+                                    React.createElement('td', { style: TD }, item.lote || '—'),
+                                    // 9. Ubicación
+                                    React.createElement('td', { style: TD }, item.ubicacion || '—'),
+                                    // 10. Estado
+                                    React.createElement('td', { style: TD },
+                                        React.createElement('span', {
+                                            style: {
+                                                display: 'inline-block',
+                                                padding: '4px 10px',
+                                                borderRadius: 20,
+                                                fontSize: 11,
+                                                fontWeight: 500,
+                                                background: estadoColor + '20',
+                                                color: estadoColor
+                                            }
+                                        }, estadoLabel)
+                                    ),
+                                    // 11. Acción
                                     React.createElement('td', { style: TD },
                                         React.createElement(Btn, { small: true, onClick: () => { setTransferItem(item); setView('transferir'); } }, 'Transferir')
                                     )

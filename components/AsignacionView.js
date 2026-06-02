@@ -1,10 +1,17 @@
-// components/AsignacionView.js
+// components/AsignacionView.js - Versión definitiva con scroll en dropdown de OT
 function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
     const listaOts = Array.isArray(ots) ? ots : [];
     const listaInventario = Array.isArray(inv) ? inv : [];
     const listaTecnicos = Array.isArray(tecnicos) ? tecnicos : [];
 
-    const [form, setForm] = React.useState({ ot_id: '', usuario_asignado: '', usuario_cedula: '', usuario_id: null, obs: '' });
+    const [form, setForm] = React.useState({
+        ot_buscar: '',
+        ot_id: '',
+        usuario_asignado: '',
+        usuario_cedula: '',
+        usuario_id: null,
+        obs: ''
+    });
     const [equipos, setEquipos] = React.useState([{ buscar: '', id: null, desc: '', serial: '', estado: '', error: false }]);
     const [materiales, setMateriales] = React.useState([{ inventario_id: '', cantidad: 1, disponible: 0 }]);
 
@@ -13,23 +20,31 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
     const [activeDropdown, setActiveDropdown] = React.useState(null);
     const [cargandoOT, setCargandoOT] = React.useState(false);
 
-    const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
+    const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-    // Equipos serializados disponibles (STOCK o INGRESADO)
     const poolSerialesDisponibles = listaInventario.filter(i => 
         i.serial && 
         (i.estado === 'STOCK' || i.estado === 'INGRESADO') &&
         i.cantidad > 0
     );
     
-    // Materiales no serializados disponibles (STOCK o INGRESADO)
     const poolMaterialesDisponibles = listaInventario.filter(i => 
         !i.serial && 
         i.cantidad > 0 && 
         (i.estado === 'STOCK' || i.estado === 'INGRESADO')
     );
 
-    // Cargar equipos serializados y materiales no serializados según OT seleccionada
+    // Coincidencias para OT (solo OTs no cerradas)
+    const otCoincidencias = form.ot_buscar.trim().length > 0
+        ? listaOts
+            .filter(ot => ot.estado !== 'completado' && ot.estado !== 'CERRADA')
+            .filter(ot => 
+                (ot.numero_ot && ot.numero_ot.toLowerCase().includes(form.ot_buscar.toLowerCase())) ||
+                (ot.cliente && ot.cliente.toLowerCase().includes(form.ot_buscar.toLowerCase()))
+            )
+            .slice(0, 8)  // Aumentamos un poco el límite
+        : [];
+
     const cargarPorOT = (otId) => {
         if (!otId) return;
         setCargandoOT(true);
@@ -77,7 +92,6 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         }
     };
 
-    // Auto-cargar al seleccionar OT
     React.useEffect(() => {
         if (form.ot_id) {
             cargarPorOT(form.ot_id);
@@ -87,7 +101,7 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         }
     }, [form.ot_id]);
 
-    // ========== AUTOCOMPLETE TÉCNICOS ==========
+    // Autocompletado técnicos
     const coincidenciasTecnicos = form.usuario_asignado.trim().length > 0
         ? listaTecnicos.filter(t => t.nombre.toLowerCase().includes(form.usuario_asignado.toLowerCase())).slice(0, 5)
         : [];
@@ -97,7 +111,20 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         setActiveDropdown(null);
     };
 
-    // ========== LÓGICA EQUIPOS SERIALIZADOS ==========
+    // Autocompletado OT
+    const handleOTSearchChange = (e) => {
+        const value = e.target.value;
+        setForm(p => ({ ...p, ot_buscar: value, ot_id: '' }));
+        setActiveDropdown('ot');
+    };
+
+    const seleccionarOTPredictivo = (ot) => {
+        const displayText = `${ot.numero_ot || ot.id} — ${ot.cliente || 'Sin cliente'}`;
+        setForm(p => ({ ...p, ot_buscar: displayText, ot_id: ot.id }));
+        setActiveDropdown(null);
+    };
+
+    // Lógica equipos serializados
     const handleSerialSearchChange = (index, value) => {
         const nuevos = [...equipos];
         nuevos[index].buscar = value;
@@ -124,7 +151,7 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         else setEquipos(equipos.filter((_, i) => i !== index));
     };
 
-    // ========== LÓGICA MATERIALES NO SERIALIZADOS ==========
+    // Lógica materiales no serializados
     const handleMaterialChange = (index, invId) => {
         const nuevos = [...materiales];
         nuevos[index].inventario_id = invId;
@@ -149,7 +176,7 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         else setMateriales(materiales.filter((_, i) => i !== index));
     };
 
-    // ========== ENVÍO ==========
+    // Envío
     const handleEnviarAsignacion = async () => {
         if (!form.usuario_asignado.trim()) {
             setAlert({ type: 'error', msg: 'El técnico es obligatorio.' });
@@ -184,7 +211,14 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
             if (typeof refresh === 'function') await refresh();
             setEquipos([{ buscar: '', id: null, desc: '', serial: '', estado: '', error: false }]);
             setMateriales([{ inventario_id: '', cantidad: 1, disponible: 0 }]);
-            setForm({ ot_id: '', usuario_asignado: '', usuario_cedula: '', usuario_id: null, obs: '' });
+            setForm({
+                ot_buscar: '',
+                ot_id: '',
+                usuario_asignado: '',
+                usuario_cedula: '',
+                usuario_id: null,
+                obs: ''
+            });
             setAlert({ type: 'success', msg: '¡Equipos entregados al técnico correctamente!' });
         } catch (err) {
             setAlert({ type: 'error', msg: err.message || 'Error al procesar la entrega.' });
@@ -193,7 +227,7 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         }
     };
 
-    // ========== UTILS ==========
+    // Utils de estilo
     const getEstadoTexto = (estado) => {
         switch(estado) {
             case 'STOCK': return '📦 Stock libre';
@@ -216,7 +250,6 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         }
     };
 
-    // Formatear material para mostrar código + descripción
     const formatearMaterial = (mat) => {
         const codigo = mat.material_id || '';
         const desc = mat.descripcion || mat.material_descripcion || '';
@@ -229,17 +262,18 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // ========== RENDERIZADO ==========
+    // Renderizado
     return React.createElement('div', { style: { maxWidth: '800px', margin: '0 auto' } },
         React.createElement('h2', { style: { margin: '0 0 1.25rem', fontWeight: 500, fontSize: 18 } }, 'Entrega de Equipos a Técnico'),
         alert && React.createElement(Alert, { type: alert.type, msg: alert.msg, onClose: () => setAlert(null) }),
 
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 16 } },
 
-            // CARD 1: RESPONSABLE
+            // CARD 1: Datos de la entrega
             React.createElement('div', { style: { ...CARD, padding: '1.25rem' } },
                 React.createElement('p', { style: { margin: '0 0 1rem', fontWeight: 500, fontSize: 14 } }, '📋 Datos de la Entrega'),
                 React.createElement('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 } },
+                    // Técnico
                     React.createElement('div', { style: { position: 'relative' } },
                         React.createElement('label', { style: LBL }, 'Técnico *'),
                         React.createElement('input', {
@@ -258,19 +292,58 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
                                 key: tIdx,
                                 onClick: () => seleccionarTecnicoPredictivo(tecnico),
                                 style: { padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--bg-secondary)', display: 'flex', alignItems: 'center' },
-                                onMouseEnter: e => e.target.style.background = 'var(--bg-secondary)',
-                                onMouseLeave: e => e.target.style.background = 'transparent'
+                                onMouseEnter: e => e.currentTarget.style.background = 'var(--bg-secondary)',
+                                onMouseLeave: e => e.currentTarget.style.background = 'transparent'
                             },
                                 React.createElement('i', { className: 'ti ti-user', style: { marginRight: 8, color: 'var(--text-secondary)', fontSize: 16 } }),
                                 tecnico.nombre
                             ))
                         )
                     ),
-                    React.createElement('div', null,
+                    // OT (autocompletado con scroll forzado)
+                    React.createElement('div', { style: { position: 'relative', overflow: 'visible' } },
                         React.createElement('label', { style: LBL }, 'OT (Opcional)'),
-                        React.createElement('select', { value: form.ot_id, onChange: f('ot_id') },
-                            React.createElement('option', { value: '' }, 'Sin OT'),
-                            listaOts.filter(o => o.estado !== 'completado' && o.estado !== 'CERRADA').map(o => React.createElement('option', { key: o.id, value: o.id }, `${o.numero_ot || o.id} — ${o.cliente || 'Sin cliente'}`))
+                        React.createElement('input', {
+                            value: form.ot_buscar,
+                            onChange: handleOTSearchChange,
+                            placeholder: 'Buscar por número de OT o cliente...',
+                            onFocus: () => setActiveDropdown('ot'),
+                            style: { 
+                                borderColor: form.ot_id ? '#2e7d32' : undefined, 
+                                backgroundColor: form.ot_id ? '#f0f9f0' : undefined,
+                                width: '100%'
+                            }
+                        }),
+                        form.ot_id && React.createElement('span', { style: { position: 'absolute', right: '10px', top: '38px', fontSize: '12px', color: '#2e7d32' } }, '✓'),
+                        activeDropdown === 'ot' && otCoincidencias.length > 0 && React.createElement('div', {
+                            style: { 
+                                position: 'absolute', 
+                                top: '100%', 
+                                left: 0, 
+                                right: 0, 
+                                background: '#fff', 
+                                border: '1px solid var(--color-border-secondary)', 
+                                borderRadius: '8px', 
+                                zIndex: 1050, 
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)', 
+                                maxHeight: '200px', 
+                                overflowY: 'auto',
+                                scrollbarWidth: 'thin'
+                            }
+                        },
+                            otCoincidencias.map(ot => React.createElement('div', {
+                                key: ot.id,
+                                onClick: () => seleccionarOTPredictivo(ot),
+                                style: { padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--color-border-tertiary)' },
+                                onMouseEnter: e => e.currentTarget.style.backgroundColor = 'var(--color-background-secondary)',
+                                onMouseLeave: e => e.currentTarget.style.backgroundColor = 'transparent'
+                            },
+                                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                                    React.createElement('strong', { style: { fontSize: '0.85rem' } }, ot.numero_ot || ot.id),
+                                    React.createElement('span', { style: { fontSize: '0.7rem', color: 'var(--color-text-secondary)' } }, ot.cliente || 'Sin cliente')
+                                ),
+                                ot.fecha && React.createElement('div', { style: { fontSize: '0.7rem', color: '#888', marginTop: 4 } }, `📅 ${new Date(ot.fecha).toLocaleDateString()}`)
+                            ))
                         )
                     )
                 ),
@@ -280,7 +353,7 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
                 )
             ),
 
-            // CARD 2: EQUIPOS SERIALIZADOS
+            // CARD 2: Equipos serializados (sin cambios)
             React.createElement('div', { style: { ...CARD, padding: '1.25rem' } },
                 React.createElement('p', { style: { margin: '0 0 1rem', fontWeight: 500, fontSize: 14 } }, '🔍 Equipos a Entregar'),
                 cargandoOT && React.createElement('div', { style: { fontSize: 12, color: '#666', marginBottom: 8 } }, 'Cargando equipos de la OT...'),
@@ -305,8 +378,8 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
                                         key: item.id,
                                         onClick: () => seleccionarEquipoPredictivo(idx, item),
                                         style: { padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--bg-secondary)' },
-                                        onMouseEnter: e => e.target.style.background = 'var(--bg-secondary)',
-                                        onMouseLeave: e => e.target.style.background = 'transparent'
+                                        onMouseEnter: e => e.currentTarget.style.background = 'var(--bg-secondary)',
+                                        onMouseLeave: e => e.currentTarget.style.background = 'transparent'
                                     },
                                         React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
                                             React.createElement('div', null,
@@ -331,7 +404,7 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
                 poolSerialesDisponibles.length === 0 && React.createElement('div', { style: { marginTop: 8, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center' } }, '⚠️ No hay equipos disponibles en bodega para entregar.')
             ),
 
-            // CARD 3: MATERIALES NO SERIALIZADOS (con descripción y cantidad editable)
+            // CARD 3: Materiales consumibles (sin cambios)
             React.createElement('div', { style: { ...CARD, padding: '1.25rem' } },
                 React.createElement('p', { style: { margin: '0 0 1rem', fontWeight: 500, fontSize: 14 } }, '📦 Materiales Consumibles'),
                 poolMaterialesDisponibles.length === 0 && React.createElement('div', { style: { marginBottom: 12, padding: '8px', background: '#fff3cd', borderRadius: 6, fontSize: 12, color: '#856404' } },
@@ -340,7 +413,6 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
                 React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto', paddingRight: 4 } },
                     materiales.map((mat, idx) => {
                         const selectedMaterial = poolMaterialesDisponibles.find(m => m.id === parseInt(mat.inventario_id));
-                        const displayText = selectedMaterial ? formatearMaterial(selectedMaterial) : 'Seleccione material...';
                         return React.createElement('div', { key: idx, style: { display: 'flex', gap: 6, alignItems: 'center' } },
                             React.createElement('select', {
                                 value: mat.inventario_id,
@@ -387,10 +459,11 @@ function AsignacionView({ bodegas, inv, ots, tecnicos, refresh }) {
                 React.createElement('hr', { style: { border: 'none', borderTop: '1px solid var(--border)', margin: '16px 0' } }),
                 React.createElement('div', { style: { background: 'var(--bg-secondary)', padding: '12px', borderRadius: 8, marginBottom: 16 } },
                     React.createElement('p', { style: { fontSize: 12, fontWeight: 500, marginBottom: 8 } }, '📊 Resumen de entrega'),
-                    React.createElement('div', { style: { fontSize: 12, display: 'flex', gap: 16 } },
+                    React.createElement('div', { style: { fontSize: 12, display: 'flex', gap: 16, flexWrap: 'wrap' } },
                         React.createElement('span', null, `🔧 Equipos: ${equipos.filter(e => e.id).length}`),
                         React.createElement('span', null, `📦 Materiales: ${materiales.filter(m => m.inventario_id).length}`),
-                        form.usuario_id && React.createElement('span', null, `👤 Técnico: ${form.usuario_asignado}`)
+                        form.usuario_id && React.createElement('span', null, `👤 Técnico: ${form.usuario_asignado}`),
+                        form.ot_id && React.createElement('span', null, `📋 OT: ${form.ot_buscar}`)
                     )
                 ),
                 React.createElement(Btn, { onClick: handleEnviarAsignacion, loading: saving, style: { width: '100%', padding: '10px' } }, '🚀 Entregar al Técnico')

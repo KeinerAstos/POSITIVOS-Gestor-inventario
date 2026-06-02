@@ -154,94 +154,69 @@ router.post('/asignar', async (req, res) => {
     }
 
     // Procesar materiales no serializados (MODIFICADO: ahora pasan a TERRENO)
+    // Procesar materiales no serializados (AHORA PASAN A TERRENO)
     if (Array.isArray(materiales_no_serializados) && materiales_no_serializados.length > 0) {
       for (const mat of materiales_no_serializados) {
         const inventario_id = Number(mat.inventario_id);
-        const cant = Number(mat.cantidad_descontar);
+        let cant = Number(mat.cantidad_descontar);
 
-        if (!inventario_id || isNaN(cant) || cant <= 0) continue;
+        // ✅ VALIDACIÓN ESTRICTA
+        if (!inventario_id || isNaN(cant) || !Number.isInteger(cant) || cant < 1) {
+          console.log(`⚠️ Cantidad inválida (${cant}) para material ID ${inventario_id}. Se omite.`);
+          continue;
+        }
 
         const { rows } = await client.query(
           `SELECT cantidad, bodega_id, material_id
-           FROM inventario 
-           WHERE id = $1 AND serial IS NULL
-           FOR UPDATE`,
+       FROM inventario 
+       WHERE id = $1 AND serial IS NULL
+       FOR UPDATE`,
           [inventario_id]
         );
-
         if (rows.length === 0) {
           throw new Error(`El material ID ${inventario_id} no es un consumible válido.`);
         }
-
         const currentStock = rows[0];
-
         if (Number(currentStock.cantidad) < cant) {
-          throw new Error(
-            `Stock insuficiente. Disponibles: ${currentStock.cantidad}.`
-          );
+          throw new Error(`Stock insuficiente. Disponibles: ${currentStock.cantidad}.`);
         }
 
-        // Descontar stock del registro original
+        // Descontar stock
         await client.query(
           `UPDATE inventario 
-           SET cantidad = cantidad - $2 
-           WHERE id = $1`,
+       SET cantidad = cantidad - $2 
+       WHERE id = $1`,
           [inventario_id, cant]
         );
 
-        // Crear NUEVO registro en estado TERRENO (no CONSUMO)
+        // Crear NUEVO registro con estado TERRENO (cantidad debe ser >=1)
         const insertResult = await client.query(
           `INSERT INTO inventario (
-            material_id,
-            cantidad,
-            ot_id,
-            usuario_asignado,
-            estado,
-            bodega_id,
-            created_at
-          )
-          SELECT
-            material_id,
-            $2,
-            $3,
-            $4,
-            'TERRENO',   -- ← Cambiado de 'CONSUMO' a 'TERRENO'
-            bodega_id,
-            NOW()
-          FROM inventario
-          WHERE id = $1
-          RETURNING id`,
+        material_id, cantidad, ot_id, usuario_asignado,
+        estado, bodega_id, created_at
+      )
+      SELECT
+        material_id, $2, $3, $4,
+        'TERRENO',
+        bodega_id, NOW()
+      FROM inventario
+      WHERE id = $1
+      RETURNING id`,
           [inventario_id, cant, ot_id || null, tecnico]
         );
         const nuevoId = insertResult.rows[0].id;
 
-        // Registrar movimiento de asignación a terreno para el nuevo material
+        // Registrar movimiento
         await client.query(
           `INSERT INTO movimientos (
-            tipo_movimiento,
-            inventario_id,
-            ot_nueva,
-            estado_anterior,
-            estado_nuevo,
-            bodega_origen_id,
-            usuario_id,
-            tecnico_id,
-            observacion,
-            created_at
-          ) VALUES (
-            'ASIGNACION_TERRENO',
-            $1,
-            $2,
-            'STOCK',
-            'TERRENO',
-            $3,
-            $4,
-            $5,
-            $6,
-            NOW()
-          )`,
+        tipo_movimiento, inventario_id, ot_nueva, estado_anterior,
+        estado_nuevo, bodega_origen_id, usuario_id, tecnico_id,
+        observacion, created_at
+      ) VALUES (
+        'ASIGNACION_TERRENO', $1, $2, 'STOCK', 'TERRENO', $3, $4, $5, $6, NOW()
+      )`,
           [nuevoId, ot_id || null, currentStock.bodega_id, tecnico, tecnico,
-           observacion || `Asignación de material a técnico ID: ${tecnico} - Cantidad: ${cant}`]
+            observacion || `Asignación de material a técnico ID: ${tecnico} - Cantidad: ${cant}`]
         );
 
         console.log(`✅ Material ${inventario_id}: se entregaron ${cant} unidades en estado TERRENO (nuevo ID: ${nuevoId})`);
@@ -535,91 +510,124 @@ router.put('/:id', async (req, res) => {
 });
 
 router.post('/devolver-bodega', async (req, res) => {
-  const { inventario_id, conservar_ot, observacion } = req.body;
-  // conservar_ot: si es true, mantiene la OT (INGRESADO), si es false, queda libre (STOCK)
+    const { inventario_id, conservar_ot, observacion, cantidad_devolver } = req.body;
 
-  const client = await pool.connect();
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
 
-  try {
-    await client.query('BEGIN');
+        // Obtener el elemento (equipo o material)
+        const { rows } = await client.query(
+            `SELECT id, estado, ot_id, bodega_id, material_id, serial, cantidad
+             FROM inventario 
+             WHERE id = $1 
+             FOR UPDATE`,
+            [inventario_id]
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Elemento no encontrado' });
+        }
+        const item = rows[0];
+        if (item.estado !== 'TERRENO') {
+            return res.status(400).json({ error: 'Solo elementos en TERRENO pueden devolverse' });
+        }
 
-    const { rows } = await client.query(
-      `SELECT id, estado, ot_id, bodega_id 
-       FROM inventario 
-       WHERE id = $1 
-       FOR UPDATE`,
-      [inventario_id]
-    );
+        let cantidadADevolver = (cantidad_devolver !== undefined) ? cantidad_devolver : item.cantidad;
+        if (cantidadADevolver <= 0 || cantidadADevolver > item.cantidad) {
+            return res.status(400).json({ error: 'Cantidad a devolver inválida' });
+        }
 
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Equipo no encontrado' });
+        const esSerializable = item.serial !== null;
+
+        if (esSerializable) {
+            // Equipo serializado: debe devolverse entero (cantidad=1)
+            if (cantidadADevolver !== 1) {
+                return res.status(400).json({ error: 'Para equipos serializados la cantidad a devolver debe ser 1' });
+            }
+            const estadoFinal = conservar_ot ? 'INGRESADO' : 'STOCK';
+            await client.query(
+                `UPDATE inventario 
+                 SET estado = $1,
+                     usuario_asignado = NULL,
+                     ot_id = $2
+                 WHERE id = $3`,
+                [estadoFinal, conservar_ot ? item.ot_id : null, inventario_id]
+            );
+            await client.query(
+                `INSERT INTO movimientos (
+                    tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+                    estado_nuevo, bodega_destino_id, observacion, created_at
+                ) VALUES (
+                    'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', $3, $4, $5, NOW()
+                )`,
+                [inventario_id, item.ot_id, estadoFinal, item.bodega_id, observacion || 'Devolución a bodega']
+            );
+        } else {
+            // Material no serializado: reintegrar al stock original
+            // Buscar registro de stock existente (mismo material, bodega, sin serial, misma OT si conservar_ot)
+            let stockQuery = `
+                SELECT id, cantidad
+                FROM inventario 
+                WHERE material_id = $1 
+                  AND bodega_id = $2 
+                  AND serial IS NULL
+            `;
+            const params = [item.material_id, item.bodega_id];
+            if (conservar_ot) {
+                stockQuery += ` AND ot_id = $3`;
+                params.push(item.ot_id);
+            } else {
+                stockQuery += ` AND (ot_id IS NULL OR ot_id = 0)`;
+            }
+            const { rows: stockRows } = await client.query(stockQuery, params);
+            let stockId;
+            if (stockRows.length > 0) {
+                stockId = stockRows[0].id;
+                await client.query(
+                    `UPDATE inventario SET cantidad = cantidad + $1 WHERE id = $2`,
+                    [cantidadADevolver, stockId]
+                );
+            } else {
+                const estadoStock = conservar_ot ? 'INGRESADO' : 'STOCK';
+                const insertRes = await client.query(
+                    `INSERT INTO inventario (material_id, cantidad, ot_id, estado, bodega_id, created_at)
+                     VALUES ($1, $2, $3, $4, $5, NOW())
+                     RETURNING id`,
+                    [item.material_id, cantidadADevolver, conservar_ot ? item.ot_id : null, estadoStock, item.bodega_id]
+                );
+                stockId = insertRes.rows[0].id;
+            }
+
+            // Reducir o eliminar el registro en TERRENO
+            if (cantidadADevolver === item.cantidad) {
+                await client.query(`DELETE FROM inventario WHERE id = $1`, [inventario_id]);
+            } else {
+                await client.query(
+                    `UPDATE inventario SET cantidad = cantidad - $1 WHERE id = $2`,
+                    [cantidadADevolver, inventario_id]
+                );
+            }
+
+            await client.query(
+                `INSERT INTO movimientos (
+                    tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+                    estado_nuevo, bodega_destino_id, observacion, created_at
+                ) VALUES (
+                    'DEVOLUCION_MATERIAL', $1, $2, 'TERRENO', 'STOCK', $3, $4, NOW()
+                )`,
+                [inventario_id, item.ot_id, item.bodega_id, observacion || 'Devolución de material a bodega']
+            );
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Devolución procesada correctamente' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error en devolución:', err);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
-
-    const equipo = rows[0];
-
-    if (equipo.estado !== 'TERRENO') {
-      return res.status(400).json({
-        error: `Solo equipos en TERRENO pueden devolverse a bodega. Estado actual: ${equipo.estado}`
-      });
-    }
-
-    // Determinar estado final al devolver
-    const estadoFinal = conservar_ot ? 'INGRESADO' : 'STOCK';
-
-    // Actualizar inventario (sin updated_at)
-    await client.query(
-      `UPDATE inventario 
-       SET estado = $2,
-           usuario_asignado = NULL,
-           ot_id = $3
-       WHERE id = $1`,
-      [inventario_id, estadoFinal, conservar_ot ? equipo.ot_id : null]
-    );
-
-    // Registrar movimiento
-    await client.query(
-      `INSERT INTO movimientos (
-        tipo_movimiento,
-        inventario_id,
-        ot_anterior,
-        estado_anterior,
-        estado_nuevo,
-        bodega_destino_id,
-        observacion,
-        created_at
-      ) VALUES (
-        'DEVOLUCION_BODEGA',
-        $1,
-        $2,
-        'TERRENO',
-        $3,
-        $4,
-        $5,
-        NOW()
-      )`,
-      [
-        inventario_id,
-        equipo.ot_id,
-        estadoFinal,
-        equipo.bodega_id,
-        observacion || `Equipo devuelto a bodega como ${estadoFinal === 'INGRESADO' ? 'asociado a OT' : 'stock libre'}`
-      ]
-    );
-
-    await client.query('COMMIT');
-
-    res.json({
-      success: true,
-      message: `Equipo devuelto a bodega como ${estadoFinal === 'INGRESADO' ? 'INGRESADO (con OT)' : 'STOCK (libre)'}`,
-      estado: estadoFinal
-    });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error('Error en devolución:', err);
-    res.status(500).json({ error: err.message });
-  } finally {
-    client.release();
-  }
 });
 
 router.post('/reasignar-ot', async (req, res) => {
