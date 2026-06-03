@@ -1,46 +1,35 @@
-// components/ReasignacionOTView.js
+// components/ReasignacionOTView.js (corregido)
 function ReasignacionOTView({ inv, ots, refresh }) {
     const listaInventario = Array.isArray(inv) ? inv : [];
     const listaOts = Array.isArray(ots) ? ots : [];
 
-    // Estados para equipos serializados (incluye OT y OTH actuales)
     const [equipos, setEquipos] = React.useState([{ 
         buscar: '', id: null, desc: '', serial: '', 
         ot_actual_id: null, ot_actual_numero: '', oth_actual: '', error: false 
     }]);
-
-    // Estados para materiales no serializados
     const [materiales, setMateriales] = React.useState([{ 
         inventario_id: '', cantidad: 1, disponible: 0, 
         ot_actual_id: null, ot_actual_numero: '', oth_actual: '' 
     }]);
-
-    // Estado para OT destino
     const [otDestino, setOtDestino] = React.useState('');
     const [otDestinoId, setOtDestinoId] = React.useState(null);
     const [otDestinoInfo, setOtDestinoInfo] = React.useState(null);
     const [showOtDropdown, setShowOtDropdown] = React.useState(false);
-
     const [nuevoOth, setNuevoOth] = React.useState('');
     const [observacion, setObservacion] = React.useState('');
     const [saving, setSaving] = React.useState(false);
     const [alert, setAlert] = React.useState(null);
     const [activeDropdown, setActiveDropdown] = React.useState(null);
 
-    // Usuario actual (puedes cambiarlo por el ID real)
     const usuarioId = window.CURRENT_USER_ID || 1;
 
-    // Equipos serializados con OT (en bodega)
     const equiposConOT = listaInventario.filter(i =>
         i.serial && i.ot_id !== null && (i.estado === 'STOCK' || i.estado === 'INGRESADO')
     );
-
-    // Materiales no serializados con OT
     const materialesConOT = listaInventario.filter(i =>
         !i.serial && i.cantidad > 0 && (i.estado === 'INGRESADO' || i.estado === 'STOCK')
     );
 
-    // Filtrar OT destino (excluyendo la actual)
     const getFilteredOTs = () => {
         if (!otDestino.trim()) return [];
         const term = otDestino.toLowerCase();
@@ -48,14 +37,13 @@ function ReasignacionOTView({ inv, ots, refresh }) {
             const numero = (ot.numero_ot || '').toLowerCase();
             const cliente = (ot.cliente || '').toLowerCase();
             const match = numero.includes(term) || cliente.includes(term);
-            // Excluir la OT actual del primer equipo (si hay)
             const currentOtId = equipos[0]?.ot_actual_id;
             return match && ot.id !== currentOtId;
         }).slice(0, 8);
     };
     const filteredOTs = getFilteredOTs();
 
-    // ---- Lógica para equipos serializados ----
+    // Equipos serializados
     const handleEquipoSearchChange = (index, value) => {
         const nuevos = [...equipos];
         nuevos[index].buscar = value;
@@ -92,7 +80,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
         }
     };
 
-    // ---- Lógica para materiales no serializados ----
+    // Materiales no serializados
     const handleMaterialChange = (index, invId) => {
         const nuevos = [...materiales];
         nuevos[index].inventario_id = invId;
@@ -101,12 +89,18 @@ function ReasignacionOTView({ inv, ots, refresh }) {
         nuevos[index].ot_actual_id = match ? match.ot_id : null;
         nuevos[index].ot_actual_numero = match ? (match.numero_ot || '') : '';
         nuevos[index].oth_actual = match ? (match.oth || '') : '';
+        // Reiniciar cantidad a 1
+        nuevos[index].cantidad = 1;
         setMateriales(nuevos);
     };
 
     const handleMaterialCantChange = (index, cant) => {
         const nuevos = [...materiales];
-        nuevos[index].cantidad = Math.max(1, parseInt(cant) || 1);
+        let nuevaCant = parseInt(cant);
+        if (isNaN(nuevaCant) || nuevaCant < 1) nuevaCant = 1;
+        const disponible = nuevos[index].disponible;
+        if (nuevaCant > disponible) nuevaCant = disponible;
+        nuevos[index].cantidad = nuevaCant;
         setMateriales(nuevos);
     };
 
@@ -122,7 +116,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
         }
     };
 
-    // ---- Selección de OT destino ----
+    // Selección OT destino
     const selectOTDestino = (ot) => {
         setOtDestino(ot.numero_ot || `OT #${ot.id}`);
         setOtDestinoId(ot.id);
@@ -146,12 +140,12 @@ function ReasignacionOTView({ inv, ots, refresh }) {
 
     const getOTInfo = (otId) => listaOts.find(ot => ot.id === otId);
 
-    // ---- Envío de reasignación (actualizado para enviar oth) ----
+    // Envío corregido
     const handleReasignar = async () => {
         const idsEquipos = equipos.filter(e => e.id !== null).map(e => e.id);
-        const idsMateriales = materiales.filter(m => m.inventario_id !== '').map(m => parseInt(m.inventario_id));
+        const materialesValidos = materiales.filter(m => m.inventario_id !== '');
 
-        if (idsEquipos.length === 0 && idsMateriales.length === 0) {
+        if (idsEquipos.length === 0 && materialesValidos.length === 0) {
             setAlert({ type: 'error', msg: 'Debes seleccionar al menos un equipo o material para reasignar.' });
             return;
         }
@@ -164,7 +158,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
         setAlert(null);
 
         try {
-            // Reasignar equipos serializados
+            // Reasignar equipos serializados (no necesitan cantidad)
             for (const id of idsEquipos) {
                 await http.post('/inventario/reasignar-ot', {
                     inventario_id: id,
@@ -174,20 +168,21 @@ function ReasignacionOTView({ inv, ots, refresh }) {
                     observacion: observacion || 'Reasignación entre OT'
                 });
             }
-            // Reasignar materiales no serializados
-            for (const id of idsMateriales) {
+            // Reasignar materiales no serializados (con cantidad)
+            for (const mat of materialesValidos) {
                 await http.post('/inventario/reasignar-ot', {
-                    inventario_id: id,
+                    inventario_id: parseInt(mat.inventario_id),
                     ot_destino: otDestinoId,
                     oth: nuevoOth || null,
                     usuario_id: usuarioId,
-                    observacion: observacion || 'Reasignación de material entre OT'
+                    observacion: observacion || 'Reasignación de material entre OT',
+                    cantidad: mat.cantidad   // ← aquí está la clave
                 });
             }
 
             if (typeof refresh === 'function') await refresh();
 
-            // Resetear
+            // Resetear formulario
             setEquipos([{ buscar: '', id: null, desc: '', serial: '', ot_actual_id: null, ot_actual_numero: '', oth_actual: '', error: false }]);
             setMateriales([{ inventario_id: '', cantidad: 1, disponible: 0, ot_actual_id: null, ot_actual_numero: '', oth_actual: '' }]);
             setOtDestino('');
@@ -204,7 +199,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
         }
     };
 
-    // Cerrar dropdowns
+    // Efectos para cerrar dropdowns
     React.useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
@@ -224,7 +219,6 @@ function ReasignacionOTView({ inv, ots, refresh }) {
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
 
-    // Funciones auxiliares para mostrar info
     const getEstadoColor = (estado) => {
         switch(estado) {
             case 'STOCK': return '#2e7d32';
@@ -241,8 +235,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
         alert && React.createElement(Alert, { type: alert.type, msg: alert.msg, onClose: () => setAlert(null) }),
 
         React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 16 } },
-
-            // CARD 1: OT DESTINO
+            // CARD 1: OT DESTINO (sin cambios)
             React.createElement('div', { style: { ...CARD, padding: '1.25rem' } },
                 React.createElement('p', { style: { margin: '0 0 1rem', fontWeight: 500, fontSize: 14 } }, '📋 OT Destino'),
                 React.createElement('div', { className: 'ot-destino-container', style: { position: 'relative', marginBottom: 16 } },
@@ -290,7 +283,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
                 })
             ),
 
-            // CARD 3: EQUIPOS SERIALIZADOS (mostrando OT actual y OTH)
+            // CARD 3: EQUIPOS SERIALIZADOS (sin cambios)
             React.createElement('div', { style: { ...CARD, padding: '1.25rem' } },
                 React.createElement('p', { style: { margin: '0 0 1rem', fontWeight: 500, fontSize: 14 } }, '🔧 Equipos Serializados a Reasignar'),
                 React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto', paddingRight: 4 } },
@@ -337,7 +330,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
                 React.createElement('button', { onClick: agregarFilaEquipo, style: { background: 'none', border: 'none', color: 'var(--amber)', fontSize: 12, cursor: 'pointer', marginTop: 10, padding: 0, fontWeight: 500 } }, '+ Agregar otro equipo')
             ),
 
-            // CARD 4: MATERIALES NO SERIALIZADOS (mostrando OT actual y OTH)
+            // CARD 4: MATERIALES NO SERIALIZADOS (con cantidad ahora se envía correctamente)
             React.createElement('div', { style: { ...CARD, padding: '1.25rem' } },
                 React.createElement('p', { style: { margin: '0 0 1rem', fontWeight: 500, fontSize: 14 } }, '📦 Materiales No Serializados a Reasignar'),
                 React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto', paddingRight: 4 } },
@@ -374,7 +367,7 @@ function ReasignacionOTView({ inv, ots, refresh }) {
                 React.createElement('button', { onClick: agregarFilaMaterial, style: { background: 'none', border: 'none', color: 'var(--amber)', fontSize: 12, cursor: 'pointer', marginTop: 10, padding: 0, fontWeight: 500 } }, '+ Agregar otro material')
             ),
 
-            // CARD 5: Observación y Resumen de cambios
+            // CARD 5: Observación y Resumen
             React.createElement('div', { style: { ...CARD, padding: '1.25rem' } },
                 React.createElement('label', { style: LBL }, 'Observación (Opcional)'),
                 React.createElement('textarea', {
@@ -386,19 +379,10 @@ function ReasignacionOTView({ inv, ots, refresh }) {
                 React.createElement('div', { style: { background: 'var(--bg-secondary)', padding: 12, borderRadius: 8, margin: '16px 0' } },
                     React.createElement('p', { style: { fontSize: 12, fontWeight: 500, marginBottom: 8 } }, '📊 Resumen de Reasignación'),
                     React.createElement('div', { style: { fontSize: 12, display: 'flex', flexDirection: 'column', gap: 8 } },
-                        React.createElement('div', null, 
-                            '🔧 Equipos serializados: ', equipos.filter(e => e.id).length
-                        ),
-                        React.createElement('div', null, 
-                            '📦 Materiales: ', materiales.filter(m => m.inventario_id).length
-                        ),
-                        otDestinoInfo && React.createElement('div', null, 
-                            '📋 Nueva OT: ', otDestinoInfo.numero_ot || `OT #${otDestinoInfo.id}`
-                        ),
-                        nuevoOth && React.createElement('div', null, 
-                            '🆕 Nuevo OTH: ', nuevoOth
-                        ),
-                        // Mostrar cambios si hay equipos seleccionados
+                        React.createElement('div', null, '🔧 Equipos serializados: ', equipos.filter(e => e.id).length),
+                        React.createElement('div', null, '📦 Materiales: ', materiales.filter(m => m.inventario_id).length),
+                        otDestinoInfo && React.createElement('div', null, '📋 Nueva OT: ', otDestinoInfo.numero_ot || `OT #${otDestinoInfo.id}`),
+                        nuevoOth && React.createElement('div', null, '🆕 Nuevo OTH: ', nuevoOth),
                         equipos.filter(e => e.id).length > 0 && React.createElement('div', { style: { marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 } },
                             React.createElement('p', { style: { fontWeight: 500, marginBottom: 4 } }, 'Cambios en equipos:'),
                             equipos.filter(e => e.id).map(e => 
