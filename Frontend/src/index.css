@@ -7,7 +7,7 @@
 }
 
 :root {
-  /* Paleta corporativa Positivo S+ */
+  /* Paleta corporativa Positivo S+ (colores fijos, no cambian con el tema) */
   --primary:      #10D451;
   --primary-dark: #0BA843;
   --primary-light:#A8F0C0;
@@ -16,36 +16,6 @@
   --gris:         #A1ADAD;
   --gris-claro:   #C5CFCF;
   --gris-oscuro:  #6B7A7A;
-
-  /* Fondos (tema oscuro para la aplicación interna) */
-  --slate-50:  #F8FAFC;
-  --slate-100: #F1F5F9;
-  --slate-200: #E2E8F0;
-  --slate-300: #CBD5E1;
-  --slate-400: #94A3B8;
-  --slate-500: #64748B;
-  --slate-600: #475569;
-  --slate-700: #334155;
-  --slate-800: #1E293B;
-  --slate-900: #0F172A;
-  --slate-950: #020617;
-
-  /* Semántica */
-  --bg-app:       #0F172A;
-  --bg-sidebar:   #1E293B;
-  --bg-card:      #1E293B;
-  --bg-card-hover:#253349;
-  --bg-input:     #0F172A;
-  --bg-elevated:  #253349;
-
-  --border:       rgba(148,163,184,0.12);
-  --border-focus: rgba(16,212,81,0.5);
-  --border-strong: rgba(148,163,184,0.25);
-
-  --text-primary:   #F1F5F9;
-  --text-secondary: #A1ADAD;
-  --text-muted:     #6B7A7A;
-  --text-primary-light: #10D451;
 
   /* Status */
   --green:  #10D451;
@@ -63,7 +33,7 @@
 
   --sidebar-w: 240px;
 
-  /* Sombras con acento verde */
+  /* Sombras (fijas, aunque algunas dependen del tema, se pueden ajustar en los temas) */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
@@ -76,8 +46,8 @@
 
 html, body, #root {
   height: 100%;
-  background: var(--bg-app);
-  color: var(--text-primary);
+  background: var(--bg-app);      /* ahora definida en los temas */
+  color: var(--text-primary);    /* definida en los temas */
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.5;
@@ -87,10 +57,10 @@ html, body, #root {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--slate-700); border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: var(--slate-700, #334155); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--gris-oscuro); }
 
-/* Inputs */
+/* Inputs (usarán variables de tema) */
 input, select, textarea {
   width: 100%;
   padding: 8px 12px;
@@ -108,7 +78,7 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(16,212,81,0.2);
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
-select option { background: var(--slate-800); color: var(--text-primary); }
+select option { background: var(--bg-elevated); color: var(--text-primary); }
 
 /* Tablas */
 table { width: 100%; border-collapse: collapse; }
@@ -155,6 +125,6 @@ tbody tr:last-child td { border-bottom: none; }
 }
 .slide-left { animation: slideLeft 0.2s ease; }
 
-/* Pulse dot - ahora verde */
+/* Pulse dot */
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 .pulse { animation: pulse 2s ease-in-out infinite; background: var(--primary) !important; }

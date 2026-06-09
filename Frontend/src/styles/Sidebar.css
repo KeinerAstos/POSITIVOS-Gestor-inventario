@@ -1,9 +1,9 @@
-/* Sidebar.css - Estilos para el menú lateral */
+/* Sidebar.css - Estilos para el menú lateral con variables de tema */
 
 .sidebar {
   flex-shrink: 0;
-  background: var(--bg-sidebar, #FFFFFF);
-  border-right: 1px solid var(--border, rgba(161,173,173,0.2));
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -22,10 +22,9 @@
   width: 240px;
 }
 
-/* Logo area */
 .sidebar-logo {
   padding: 18px 16px;
-  border-bottom: 1px solid var(--border, rgba(161,173,173,0.2));
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -42,12 +41,12 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #10D451, #0BA843);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-primary-dark, #0BA843));
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 0 16px rgba(16,212,81,0.4);
+  box-shadow: 0 0 16px rgba(var(--accent-primary-rgb, 16, 212, 81), 0.4);
 }
 
 .logo-icon i {
@@ -58,13 +57,12 @@
 .logo-text {
   font-weight: 700;
   font-size: 15px;
-  color: var(--text-primary, #1E2A3A);
-  letter-spacing: -0.01em;
+  color: var(--text-primary);
 }
 
 .logo-sub {
   font-size: 10px;
-  color: var(--text-muted, #6B7A8A);
+  color: var(--text-muted);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -73,7 +71,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-muted, #6B7A8A);
+  color: var(--text-muted);
   padding: 4px;
   border-radius: 6px;
   display: flex;
@@ -84,12 +82,11 @@
   font-size: 18px;
 }
 
-/* Expand button when collapsed */
 .expand-btn {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-muted, #6B7A8A);
+  color: var(--text-muted);
   padding: 10px 0;
   display: flex;
   align-items: center;
@@ -101,7 +98,6 @@
   font-size: 18px;
 }
 
-/* Navigation */
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;
@@ -125,7 +121,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted, #6B7A8A);
+  color: var(--text-muted);
   padding: 6px 8px 4px;
   margin-top: 4px;
 }
@@ -161,21 +157,21 @@
 }
 
 .nav-item-active {
-  background: linear-gradient(135deg, rgba(16,212,81,0.2), rgba(11,168,67,0.1));
-  color: #10D451;
+  background: var(--nav-active-bg);
+  color: var(--accent-primary);
   font-weight: 600;
-  border-left: 2px solid #10D451;
+  border-left: 2px solid var(--accent-primary);
 }
 
 .nav-item-inactive {
   background: transparent;
-  color: var(--text-secondary, #5A6B7A);
+  color: var(--text-secondary);
   font-weight: 400;
   border-left: 2px solid transparent;
 }
 
 .nav-item-inactive:hover {
-  background: rgba(0,0,0,0.04);
+  background: var(--nav-hover-bg);
 }
 
 .nav-icon {
@@ -183,10 +179,9 @@
   flex-shrink: 0;
 }
 
-/* User footer */
 .sidebar-footer {
   padding: 12px 14px;
-  border-top: 1px solid var(--border, rgba(161,173,173,0.2));
+  border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -206,16 +201,16 @@
   height: 30px;
   border-radius: 8px;
   flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(16,212,81,0.3), rgba(11,168,67,0.2));
+  background: var(--accent-hover-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(16,212,81,0.3);
+  border: 1px solid rgba(var(--accent-primary-rgb, 16, 212, 81), 0.3);
 }
 
 .user-avatar i {
   font-size: 15px;
-  color: #10D451;
+  color: var(--accent-primary);
 }
 
 .user-info {
@@ -226,7 +221,7 @@
 .user-name {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-primary, #1E2A3A);
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -234,7 +229,7 @@
 
 .user-role {
   font-size: 10px;
-  color: var(--text-muted, #6B7A8A);
+  color: var(--text-muted);
   text-transform: capitalize;
 }
 
@@ -242,7 +237,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-muted, #6B7A8A);
+  color: var(--text-muted);
   padding: 4px;
   border-radius: 6px;
   display: flex;

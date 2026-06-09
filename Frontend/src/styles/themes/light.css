@@ -1,0 +1,64 @@
+/* ============================================
+   TEMA CLARO - LIGHT THEME
+   ============================================ */
+
+.light-theme {
+  /* Colores base */
+  --bg-app: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-sidebar: #ffffff;
+  --bg-input: #ffffff;
+  --bg-input-disabled: #f1f5f9;
+  
+  /* Textos */
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  
+  /* Bordes */
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  --border-strong: #cbd5e1;
+  
+  /* Colores de acento (verde, más oscuro para contraste) */
+  --accent-primary: #0f8b3a;
+  --accent-primary-dark: #0a7838;
+  --accent-primary-rgb: 15, 139, 58;
+  --accent-hover: rgba(15, 139, 58, 0.12);
+  --accent-soft: rgba(15, 139, 58, 0.06);
+  
+  /* Colores de estado (más intensos pero legibles) */
+  --danger: #dc2626;
+  --danger-rgb: 220, 38, 38;
+  --danger-soft: rgba(220, 38, 38, 0.08);
+  
+  --warning: #ea580c;
+  --warning-rgb: 234, 88, 12;
+  --warning-soft: rgba(234, 88, 12, 0.08);
+  
+  --info: #2563eb;
+  --info-rgb: 37, 99, 235;
+  --info-soft: rgba(37, 99, 235, 0.08);
+  
+  /* Elementos de UI */
+  --gray-light: #64748b;
+  --gray-soft: rgba(100, 116, 139, 0.2);
+  --dropdown-bg: #ffffff;
+  --overlay-light: rgba(0, 0, 0, 0.02);
+  --overlay-medium: rgba(0, 0, 0, 0.05);
+  --shadow-dropdown: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --btn-ghost-bg: rgba(15, 23, 42, 0.04);
+  --btn-ghost-color: #334155;
+  
+  /* Nav sidebar */
+  --nav-active-bg: linear-gradient(135deg, rgba(15, 139, 58, 0.15), rgba(11, 104, 45, 0.08));
+  --nav-hover-bg: rgba(0, 0, 0, 0.04);
+  
+  /* Radios y demás */
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
+  
+  /* Gradientes y efectos */
+  --accent-glow: rgba(217, 119, 6, 0.02);
+}

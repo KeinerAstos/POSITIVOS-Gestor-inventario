@@ -1,0 +1,107 @@
+/* ============================================
+   TEMA OSCURO - DARK THEME
+   ============================================ */
+
+.dark-theme {
+  /* Colores base */
+  --bg-app: #0f172a;
+  --bg-card: #1e293b;
+  --bg-sidebar: #0f172a;
+  --bg-input: #334155;
+  --bg-input-disabled: #1e293b;
+  
+  /* Textos */
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  
+  /* Bordes */
+  --border: #334155;
+  --border-light: #1e293b;
+  --border-strong: #475569;
+  
+  /* Colores de acento (verde) */
+  --accent-primary: #10d451;
+  --accent-primary-dark: #0ba843;
+  --accent-primary-rgb: 16, 212, 81;
+  --accent-hover: rgba(16, 212, 81, 0.15);
+  --accent-soft: rgba(16, 212, 81, 0.08);
+  
+  /* Colores de estado */
+  --danger: #ef4444;
+  --danger-rgb: 239, 68, 68;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  
+  --warning: #f97316;
+  --warning-rgb: 249, 115, 22;
+  --warning-soft: rgba(249, 115, 22, 0.1);
+  
+  --info: #3b82f6;
+  --info-rgb: 59, 130, 246;
+  --info-soft: rgba(59, 130, 246, 0.1);
+  
+  /* Elementos de UI */
+  --gray-light: #a1adad;
+  --gray-soft: rgba(161, 173, 173, 0.2);
+  --dropdown-bg: #1a2744;
+  --overlay-light: rgba(255, 255, 255, 0.02);
+  --overlay-medium: rgba(0, 0, 0, 0.2);
+  --shadow-dropdown: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --btn-ghost-bg: rgba(248, 250, 252, 0.05);
+  --btn-ghost-color: #f1f5f9;
+  
+  /* Nav sidebar */
+  --nav-active-bg: linear-gradient(135deg, rgba(16, 212, 81, 0.2), rgba(11, 168, 67, 0.1));
+  --nav-hover-bg: rgba(255, 255, 255, 0.05);
+  
+  /* Radios y demás */
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
+  
+  /* Gradientes y efectos */
+  --accent-glow: rgba(217, 119, 6, 0.04);
+}
+
+/* Aplicar también al root cuando no hay clase explícita (por defecto) */
+:root,
+.dark-theme {
+  --bg-app: #0f172a;
+  --bg-card: #1e293b;
+  --bg-sidebar: #0f172a;
+  --bg-input: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --border-light: #1e293b;
+  --border-strong: #475569;
+  --accent-primary: #10d451;
+  --accent-primary-dark: #0ba843;
+  --accent-primary-rgb: 16, 212, 81;
+  --accent-hover: rgba(16, 212, 81, 0.15);
+  --accent-soft: rgba(16, 212, 81, 0.08);
+  --danger: #ef4444;
+  --danger-rgb: 239, 68, 68;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+  --warning: #f97316;
+  --warning-rgb: 249, 115, 22;
+  --warning-soft: rgba(249, 115, 22, 0.1);
+  --info: #3b82f6;
+  --info-rgb: 59, 130, 246;
+  --info-soft: rgba(59, 130, 246, 0.1);
+  --gray-light: #a1adad;
+  --gray-soft: rgba(161, 173, 173, 0.2);
+  --dropdown-bg: #1a2744;
+  --overlay-light: rgba(255, 255, 255, 0.02);
+  --overlay-medium: rgba(0, 0, 0, 0.2);
+  --shadow-dropdown: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --btn-ghost-bg: rgba(248, 250, 252, 0.05);
+  --btn-ghost-color: #f1f5f9;
+  --nav-active-bg: linear-gradient(135deg, rgba(16, 212, 81, 0.2), rgba(11, 168, 67, 0.1));
+  --nav-hover-bg: rgba(255, 255, 255, 0.05);
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
+  --accent-glow: rgba(217, 119, 6, 0.04);
+}

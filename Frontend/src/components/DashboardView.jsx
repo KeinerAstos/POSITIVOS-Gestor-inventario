@@ -1,3 +1,4 @@
+// src/components/Views/DashboardView.jsx
 import React from 'react';
 import { fmtFecha } from '../api.js';
 import { StatCard, Card, CardHeader, EmptyState, Badge, PageHeader } from './UI.jsx';
@@ -76,7 +77,7 @@ export default function DashboardView({ bodegas = [], inv = [], mov = [] }) {
           {movRecientes.length === 0
             ? <EmptyState icon="ti-history-off" title="Sin movimientos" subtitle="No hay actividad reciente" />
             : (
-              <div style={{ overflowX: 'auto' }}>
+              <div className="dashboard-table-container">
                 <table className="dashboard-table">
                   <thead>
                     <tr>
