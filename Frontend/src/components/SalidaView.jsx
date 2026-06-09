@@ -1,7 +1,8 @@
 // src/components/SalidaView.jsx
 import React, { useState, useEffect } from 'react';
 import { http } from '../api';
-import { Btn, Alert, CARD, TH, TD, LBL } from './UI'; // Ajusta la ruta si es diferente
+import { Btn, Alert } from './UI';
+import '../styles/SalidaView.css';
 
 export default function SalidaView({ user, refresh }) {
   const [salidas, setSalidas] = useState([]);
@@ -212,7 +213,9 @@ export default function SalidaView({ user, refresh }) {
         </div>
         <h3>Equipos / Materiales</h3>
         <table>
-          <thead><tr><th>Cantidad</th><th>Material / Serial</th><th>Observación</th></tr></thead>
+          <thead>
+            <tr><th>Cantidad</th><th>Material / Serial</th><th>Observación</th></tr>
+          </thead>
           <tbody>
             ${detalles.map(d => `
               <tr>
@@ -239,8 +242,8 @@ export default function SalidaView({ user, refresh }) {
       {alert && <Alert type={alert.type} msg={alert.msg} onClose={() => setAlert(null)} />}
 
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ margin: 0, fontWeight: 500, fontSize: 18 }}>🚚 Salidas de Inventario</h2>
+      <div className="salida-header">
+        <h2 className="salida-title">🚚 Salidas de Inventario</h2>
         <Btn onClick={() => setShowForm(!showForm)}>
           <i className={`ti ti-${showForm ? 'x' : 'plus'}`} /> {showForm ? ' Cancelar' : ' Nueva Salida'}
         </Btn>
@@ -248,95 +251,98 @@ export default function SalidaView({ user, refresh }) {
 
       {/* Formulario nueva salida */}
       {showForm && (
-        <div style={{ ...CARD, padding: '1.25rem', marginBottom: '1rem' }}>
-          <p style={{ fontWeight: 500, marginBottom: '1rem' }}>📝 Registrar nueva salida</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
+        <div className="salida-form-container">
+          <p className="salida-form-title">📝 Registrar nueva salida</p>
+          <div className="salida-form-grid">
             <div>
-              <label style={LBL}>Fecha *</label>
-              <input type="date" value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
+              <label className="salida-label">Fecha *</label>
+              <input className="salida-input" type="date" value={form.fecha} onChange={e => setForm(p => ({ ...p, fecha: e.target.value }))} />
             </div>
             <div>
-              <label style={LBL}>Destino *</label>
-              <input value={form.destino} onChange={e => setForm(p => ({ ...p, destino: e.target.value }))} placeholder="Ej: A011 TABASCO POPAYÁN" />
+              <label className="salida-label">Destino *</label>
+              <input className="salida-input" value={form.destino} onChange={e => setForm(p => ({ ...p, destino: e.target.value }))} placeholder="Ej: A011 TABASCO POPAYÁN" />
             </div>
             <div>
-              <label style={LBL}>Motivo</label>
-              <input value={form.motivo} onChange={e => setForm(p => ({ ...p, motivo: e.target.value }))} placeholder="Ej: Traslado Telecom" />
+              <label className="salida-label">Motivo</label>
+              <input className="salida-input" value={form.motivo} onChange={e => setForm(p => ({ ...p, motivo: e.target.value }))} placeholder="Ej: Traslado Telecom" />
             </div>
             <div>
-              <label style={LBL}>Observaciones generales</label>
-              <textarea value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} rows={2} placeholder="Notas adicionales..." />
+              <label className="salida-label">Observaciones generales</label>
+              <textarea className="salida-textarea" rows={2} value={form.observaciones} onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))} placeholder="Notas adicionales..." />
             </div>
           </div>
-          <div style={{ marginTop: '0.5rem', fontSize: 12, color: 'var(--text-secondary)' }}>
+          <div className="salida-info">
             <i className="ti ti-info-circle" /> El responsable será <strong>{user?.nombre || 'usuario actual'}</strong> automáticamente.
           </div>
 
           {/* Selección de equipos */}
-          <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-            <p style={{ fontWeight: 500, marginBottom: '0.5rem' }}>Agregar equipos/materiales</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}>
-              <div style={{ flex: 2, position: 'relative' }}>
-                <label style={LBL}>Equipo o material</label>
+          <div className="salida-equipos-section">
+            <p className="salida-equipos-title">Agregar equipos/materiales</p>
+            <div className="salida-add-equipo">
+              <div className="salida-equipo-input-wrapper">
+                <label className="salida-label">Equipo o material</label>
                 <input
+                  className="salida-input"
                   value={buscarEquipo}
                   onChange={e => { setBuscarEquipo(e.target.value); setShowEquipoDropdown(true); if (e.target.value === '') setEquipoSeleccionado(null); }}
                   onFocus={() => setShowEquipoDropdown(true)}
                   placeholder="Buscar por serial o descripción..."
                 />
-                {showEquipoDropdown && equiposDisponibles.filter(eq => 
-                  (eq.serial && eq.serial.toLowerCase().includes(buscarEquipo.toLowerCase())) ||
-                  (eq.material_descripcion && eq.material_descripcion.toLowerCase().includes(buscarEquipo.toLowerCase()))
-                ).slice(0, 5).map(eq => (
-                  <div
-                    key={eq.id}
-                    onClick={() => { setEquipoSeleccionado(eq); setBuscarEquipo(eq.serial || eq.material_descripcion); setShowEquipoDropdown(false); }}
-                    style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid var(--border)', borderRadius: 6, zIndex: 100, padding: '8px', cursor: 'pointer' }}
-                  >
-                    <div><strong>{eq.serial || eq.material_descripcion}</strong></div>
-                    <div style={{ fontSize: 12 }}>{eq.material_id || eq.codigo_sap} - Stock: {eq.cantidad || 1}</div>
+                {showEquipoDropdown && (
+                  <div className="salida-dropdown">
+                    {equiposDisponibles.filter(eq => 
+                      (eq.serial && eq.serial.toLowerCase().includes(buscarEquipo.toLowerCase())) ||
+                      (eq.material_descripcion && eq.material_descripcion.toLowerCase().includes(buscarEquipo.toLowerCase()))
+                    ).slice(0, 5).map(eq => (
+                      <div
+                        key={eq.id}
+                        className="salida-dropdown-item"
+                        onClick={() => { setEquipoSeleccionado(eq); setBuscarEquipo(eq.serial || eq.material_descripcion); setShowEquipoDropdown(false); }}
+                      >
+                        <div className="salida-dropdown-title"><strong>{eq.serial || eq.material_descripcion}</strong></div>
+                        <div className="salida-dropdown-subtitle">{eq.material_id || eq.codigo_sap} - Stock: {eq.cantidad || 1}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={LBL}>Cantidad</label>
-                <input type="number" min={1} value={cantidadSeleccionada} onChange={e => setCantidadSeleccionada(parseInt(e.target.value) || 1)} disabled={equipoSeleccionado?.serial} />
+              <div className="salida-cantidad-wrapper">
+                <label className="salida-label">Cantidad</label>
+                <input className="salida-input" type="number" min={1} value={cantidadSeleccionada} onChange={e => setCantidadSeleccionada(parseInt(e.target.value) || 1)} disabled={equipoSeleccionado?.serial} />
               </div>
               <Btn onClick={agregarItem} secondary>➕ Agregar</Btn>
             </div>
 
             {form.items.length > 0 && (
-              <div style={{ marginTop: '1rem' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={TH}>Cantidad</th>
-                      <th style={TH}>Material / Serie</th>
-                      <th style={TH}>Observación</th>
-                      <th style={TH}>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {form.items.map((item, idx) => {
-                      const eq = equiposDisponibles.find(e => e.id === item.inventario_id);
-                      return (
-                        <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={TD}>{item.cantidad}</td>
-                          <td style={TD}>{eq ? (eq.serial || eq.material_descripcion) : item.inventario_id}</td>
-                          <td style={TD}>
-                            <input type="text" placeholder="Nota (opcional)" value={item.observacion_item} onChange={e => setForm(p => ({ ...p, items: p.items.map((i, i2) => i2 === idx ? { ...i, observacion_item: e.target.value } : i) }))} />
-                          </td>
-                          <td style={TD}><button onClick={() => eliminarItem(idx)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer' }}>🗑️</button></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <table className="salida-items-table">
+                <thead>
+                  <tr>
+                    <th>Cantidad</th>
+                    <th>Material / Serie</th>
+                    <th>Observación</th>
+                    <th>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {form.items.map((item, idx) => {
+                    const eq = equiposDisponibles.find(e => e.id === item.inventario_id);
+                    return (
+                      <tr key={idx}>
+                        <td>{item.cantidad}</td>
+                        <td>{eq ? (eq.serial || eq.material_descripcion) : item.inventario_id}</td>
+                        <td>
+                          <input className="salida-item-observacion" type="text" placeholder="Nota (opcional)" value={item.observacion_item} onChange={e => setForm(p => ({ ...p, items: p.items.map((i, i2) => i2 === idx ? { ...i, observacion_item: e.target.value } : i) }))} />
+                        </td>
+                        <td><button className="salida-remove-btn" onClick={() => eliminarItem(idx)}>🗑️</button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
 
-          <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <div className="salida-form-actions">
             <Btn onClick={handleCrearSalida} loading={saving}>Registrar Salida</Btn>
             <Btn secondary onClick={() => setShowForm(false)}>Cancelar</Btn>
           </div>
@@ -344,42 +350,42 @@ export default function SalidaView({ user, refresh }) {
       )}
 
       {/* Filtros */}
-      <div style={{ ...CARD, padding: '1rem', marginBottom: '1rem', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        <input type="text" placeholder="Destino..." value={filtroDestino} onChange={e => { setFiltroDestino(e.target.value); setPagina(1); }} style={{ flex: 2 }} />
-        <input type="date" value={filtroFecha} onChange={e => { setFiltroFecha(e.target.value); setPagina(1); }} />
+      <div className="salida-filtros">
+        <input className="salida-filtro-destino" type="text" placeholder="Destino..." value={filtroDestino} onChange={e => { setFiltroDestino(e.target.value); setPagina(1); }} />
+        <input className="salida-filtro-fecha" type="date" value={filtroFecha} onChange={e => { setFiltroFecha(e.target.value); setPagina(1); }} />
         <Btn onClick={() => { setFiltroDestino(''); setFiltroFecha(''); setPagina(1); }} secondary>Limpiar filtros</Btn>
       </div>
 
       {/* Tabla de salidas */}
-      <div style={CARD}>
+      <div className="salida-table-container">
         {loading ? (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>Cargando...</div>
+          <div className="salida-loading">Cargando...</div>
         ) : salidas.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center' }}>No hay salidas registradas</div>
+          <div className="salida-empty">No hay salidas registradas</div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="salida-table-wrapper" style={{ overflowX: 'auto' }}>
+              <table className="salida-table">
                 <thead>
                   <tr>
                     {['Consecutivo', 'Fecha', 'Destino', 'Motivo', 'Responsable', 'Cant. Items', 'Acciones'].map(h => (
-                      <th key={h} style={TH}>{h}</th>
+                      <th key={h}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {salidas.map(s => (
-                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={TD}><strong>{s.consecutivo}</strong></td>
-                      <td style={TD}>{new Date(s.fecha).toLocaleDateString('es-CO')}</td>
-                      <td style={TD}>{s.destino}</td>
-                      <td style={TD}>{s.motivo || '—'}</td>
-                      <td style={TD}>{s.responsable_nombre || '—'}</td>
-                      <td style={TD}>{s.total_items}</td>
-                      <td style={TD}>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => verDetalle(s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0288d1' }} title="Ver detalle">👁️</button>
-                          <button onClick={() => imprimirComprobante(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ed6c02' }} title="Imprimir comprobante">🖨️</button>
+                    <tr key={s.id}>
+                      <td className="salida-consecutivo">{s.consecutivo}</td>
+                      <td>{new Date(s.fecha).toLocaleDateString('es-CO')}</td>
+                      <td>{s.destino}</td>
+                      <td>{s.motivo || '—'}</td>
+                      <td>{s.responsable_nombre || '—'}</td>
+                      <td>{s.total_items}</td>
+                      <td>
+                        <div className="salida-actions">
+                          <button className="salida-action-btn salida-action-ver" onClick={() => verDetalle(s.id)} title="Ver detalle">👁️</button>
+                          <button className="salida-action-btn salida-action-imprimir" onClick={() => imprimirComprobante(s)} title="Imprimir comprobante">🖨️</button>
                         </div>
                       </td>
                     </tr>
@@ -388,10 +394,10 @@ export default function SalidaView({ user, refresh }) {
               </table>
             </div>
             {totalPaginas > 1 && (
-              <div style={{ padding: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'center', gap: 8 }}>
-                <button onClick={() => setPagina(p => Math.max(1, p-1))} disabled={pagina === 1}>Anterior</button>
-                <span>Página {pagina} de {totalPaginas}</span>
-                <button onClick={() => setPagina(p => Math.min(totalPaginas, p+1))} disabled={pagina === totalPaginas}>Siguiente</button>
+              <div className="salida-pagination">
+                <button className="salida-pagination-btn" onClick={() => setPagina(p => Math.max(1, p-1))} disabled={pagina === 1}>Anterior</button>
+                <span className="salida-pagination-info">Página {pagina} de {totalPaginas}</span>
+                <button className="salida-pagination-btn" onClick={() => setPagina(p => Math.min(totalPaginas, p+1))} disabled={pagina === totalPaginas}>Siguiente</button>
               </div>
             )}
           </>
@@ -400,30 +406,34 @@ export default function SalidaView({ user, refresh }) {
 
       {/* Modal detalle */}
       {showDetalle && detalleSalida && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ background: 'white', borderRadius: 12, maxWidth: 800, width: '90%', maxHeight: '80%', overflow: 'auto', padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <h3>Detalle de {detalleSalida.cabecera?.consecutivo || detalleSalida.consecutivo}</h3>
-              <button onClick={() => setShowDetalle(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer' }}>×</button>
+        <div className="salida-modal-overlay">
+          <div className="salida-modal-content">
+            <div className="salida-modal-header">
+              <h3 className="salida-modal-title">Detalle de {detalleSalida.cabecera?.consecutivo || detalleSalida.consecutivo}</h3>
+              <button className="salida-modal-close" onClick={() => setShowDetalle(false)}>×</button>
             </div>
-            <p><strong>Destino:</strong> {detalleSalida.cabecera?.destino || detalleSalida.destino}</p>
-            <p><strong>Motivo:</strong> {detalleSalida.cabecera?.motivo || detalleSalida.motivo || '—'}</p>
-            <p><strong>Responsable:</strong> {detalleSalida.cabecera?.responsable_nombre || detalleSalida.responsable_nombre || '—'}</p>
-            <p><strong>Observaciones:</strong> {detalleSalida.cabecera?.observaciones || detalleSalida.observaciones || '—'}</p>
-            <h4>Equipos incluidos</h4>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={TH}>Cantidad</th><th style={TH}>Material / Serie</th><th style={TH}>Observación</th></tr></thead>
+            <div className="salida-modal-info">
+              <p><strong>Destino:</strong> {detalleSalida.cabecera?.destino || detalleSalida.destino}</p>
+              <p><strong>Motivo:</strong> {detalleSalida.cabecera?.motivo || detalleSalida.motivo || '—'}</p>
+              <p><strong>Responsable:</strong> {detalleSalida.cabecera?.responsable_nombre || detalleSalida.responsable_nombre || '—'}</p>
+              <p><strong>Observaciones:</strong> {detalleSalida.cabecera?.observaciones || detalleSalida.observaciones || '—'}</p>
+            </div>
+            <h4 className="salida-modal-subtitle">Equipos incluidos</h4>
+            <table className="salida-items-table">
+              <thead>
+                <tr><th>Cantidad</th><th>Material / Serie</th><th>Observación</th></tr>
+              </thead>
               <tbody>
                 {(detalleSalida.detalles || []).map((d, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={TD}>{d.cantidad}</td>
-                    <td style={TD}>{d.serial || d.material_descripcion || d.material_id || '—'}</td>
-                    <td style={TD}>{d.observacion_item || '—'}</td>
+                  <tr key={idx}>
+                    <td>{d.cantidad}</td>
+                    <td>{d.serial || d.material_descripcion || d.material_id || '—'}</td>
+                    <td>{d.observacion_item || '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div style={{ marginTop: '1rem', textAlign: 'right' }}>
+            <div className="salida-modal-footer">
               <Btn onClick={() => imprimirComprobante(detalleSalida.cabecera || detalleSalida)}>🖨️ Imprimir comprobante</Btn>
             </div>
           </div>

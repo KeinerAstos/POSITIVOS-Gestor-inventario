@@ -1,0 +1,86 @@
+/* ReasignacionesView.css */
+.reasignaciones-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.reasignaciones-filtros-card {
+  margin-bottom: 16px;
+}
+
+.reasignaciones-filtros {
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.reasignaciones-filtro-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reasignaciones-date {
+  width: 160px;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.reasignaciones-table-container {
+  overflow-x: auto;
+}
+
+.reasignaciones-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+.reasignaciones-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.reasignaciones-table td {
+  padding: 10px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-light, #f1f5f9);
+}
+
+.reasignaciones-fecha {
+  font-size: 12px;
+}
+
+.reasignaciones-material {
+  font-weight: 500;
+}
+
+.reasignaciones-serial {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+}
+
+.reasignaciones-cantidad {
+  text-align: center;
+}
+
+.reasignaciones-oth {
+  font-size: 10px;
+  color: var(--text-muted, #64748b);
+}
+
+.reasignaciones-observacion {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+}

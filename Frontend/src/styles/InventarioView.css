@@ -1,0 +1,185 @@
+/* ============================================
+   INVENTARIO VIEW - ESTILOS ESPECÍFICOS
+   ============================================ */
+
+/* Contenedor de acciones del header */
+.inventario-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Select de exportación */
+.inventario-export-select {
+  width: 160px;
+}
+
+/* Formulario */
+.inventario-form {
+  margin-bottom: 20px;
+}
+
+.inventario-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* Campo con posición relativa (para dropdowns) */
+.inventario-field-relative {
+  position: relative;
+}
+
+/* Input con botón de limpiar */
+.inventario-input-wrapper {
+  position: relative;
+}
+
+.inventario-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #64748b);
+  font-size: 16px;
+  padding: 4px;
+}
+
+.inventario-clear-btn:hover {
+  color: var(--text-primary, #1e293b);
+}
+
+/* Badge de selección */
+.inventario-selected-badge {
+  font-size: 11px;
+  color: var(--primary, #f59e0b);
+  margin-top: 3px;
+}
+
+/* Panel de nueva OT */
+.inventario-nueva-ot {
+  background: rgba(16, 212, 81, 0.08);
+  border: 1px solid rgba(16, 212, 81, 0.2);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.inventario-nueva-ot-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary, #f59e0b);
+  margin-bottom: 10px;
+}
+
+.inventario-nueva-ot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.inventario-nueva-ot-info {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  margin-top: 8px;
+}
+
+/* Botones del formulario */
+.inventario-form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Filtros */
+.inventario-filtros {
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.inventario-search-input {
+  flex: 2;
+  min-width: 250px;
+}
+
+.inventario-bodega-select {
+  width: 180px;
+}
+
+.inventario-estado-select {
+  width: 160px;
+}
+
+/* Tabla */
+.inventario-table-container {
+  overflow-x: auto;
+}
+
+.inventario-table {
+  min-width: 1100px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inventario-table th {
+  text-align: left;
+  padding: 12px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.inventario-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-light, #f1f5f9);
+  vertical-align: middle;
+}
+
+/* Columna cantidad */
+.inventario-table .cantidad-cell {
+  text-align: center;
+}
+
+/* Código material (mono) */
+.inventario-codigo {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+/* Serie */
+.inventario-serial {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.inventario-sin-serial {
+  color: var(--text-muted, #64748b);
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .inventario-nueva-ot-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .inventario-filtros {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inventario-search-input,
+  .inventario-bodega-select,
+  .inventario-estado-select {
+    width: 100%;
+  }
+}

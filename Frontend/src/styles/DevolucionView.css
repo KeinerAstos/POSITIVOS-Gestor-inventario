@@ -1,0 +1,205 @@
+/* DevolucionView.css */
+.devolucion-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.devolucion-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 800px;
+}
+
+.devolucion-card-body {
+  padding: 20px;
+}
+
+.devolucion-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.devolucion-checkbox {
+  width: auto;
+  accent-color: var(--amber-glow, #f59e0b);
+}
+
+.devolucion-checkbox-text {
+  font-size: 14px;
+  color: var(--text-primary, #1e293b);
+  font-weight: 500;
+}
+
+.devolucion-info-badge {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  margin-left: 26px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.devolucion-info-ingresado {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.devolucion-info-stock {
+  background: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.2);
+}
+
+.devolucion-field {
+  margin-top: 14px;
+}
+
+.devolucion-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--bg-input, #ffffff);
+}
+
+.devolucion-input-success {
+  border-color: #22c55e;
+}
+
+.devolucion-equipos-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.devolucion-equipo-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding-bottom: 10px;
+}
+
+.devolucion-equipo-border {
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.devolucion-equipo-search {
+  flex: 2;
+  position: relative;
+}
+
+.devolucion-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.devolucion-dropdown-title {
+  font-size: 13px;
+}
+
+.devolucion-dropdown-badge {
+  font-size: 11px;
+  color: #3b82f6;
+}
+
+.devolucion-dropdown-details {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  display: flex;
+  gap: 12px;
+  margin-top: 3px;
+}
+
+.devolucion-equipo-preview {
+  flex: 2;
+  font-size: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+.devolucion-equipo-preview-title {
+  font-weight: 500;
+}
+
+.devolucion-equipo-preview-detail {
+  color: var(--text-muted, #64748b);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.devolucion-cantidad-wrapper {
+  margin-top: 6px;
+}
+
+.devolucion-cantidad-label {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+}
+
+.devolucion-cantidad-input {
+  width: 60px;
+  padding: 2px 6px;
+  display: inline-block;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+}
+
+.devolucion-cantidad-max {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+}
+
+.devolucion-remove-btn {
+  padding: 8px 10px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.devolucion-add-btn {
+  margin-top: 10px;
+  background: none;
+  border: none;
+  color: var(--amber-glow, #f59e0b);
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.devolucion-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+.devolucion-summary-label {
+  color: var(--text-secondary, #475569);
+}
+
+.devolucion-summary-value {
+  font-weight: 700;
+}
+
+.devolucion-submit-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}

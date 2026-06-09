@@ -8,19 +8,16 @@ import InventarioView from './components/InventarioView.jsx';
 import AsignacionView from './components/AsignacionView.jsx';
 import TecnicoView  from './components/TecnicoView.jsx';
 import FormularioActaQA from './components/FormularioActaQA.jsx';
-import SalidaView from './components/SalidaView.jsx';  // <-- NUEVA IMPORTACIÓN
-
-import {
-  DevolucionView,
-  ReasignacionOTView,
-  MovimientosView,
-  ReasignacionesView,
-  BodegasView,
-  OtsView,
-  OTDashboardView,
-  ControlCalidadView,
-  CargaMasivaView,
-} from './components/Views.jsx';
+import SalidaView from './components/SalidaView.jsx';
+import DevolucionView from './components/DevolucionView.jsx';
+import ReasignacionOTView from './components/ReasignacionOTView.jsx';
+import MovimientosView from './components/MovimientosView.jsx';
+import ReasignacionesView from './components/ReasignacionesView.jsx';
+import BodegasView from './components/BodegasView.jsx';
+import OtsView from './components/OtsView.jsx';
+import OTDashboardView from './components/OTDashboardView.jsx';
+import ControlCalidadView  from './components/ControlCalidadView.jsx';
+import CargaMasivaView from './components/CargaMasivaView.jsx';
 
 // ─── Topbar ───────────────────────────────────────────────────────
 function Topbar({ view, user, collapsed }) {
