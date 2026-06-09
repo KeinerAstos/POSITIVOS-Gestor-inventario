@@ -1,4 +1,5 @@
 // components/UIComponents.js
+// Versión global - sin import/export
 
 // Estilos globales compartidos
 const TH = { padding: '8px 12px', textAlign: 'left', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', background: 'var(--bg-secondary)' };
@@ -66,12 +67,13 @@ const NAV = [
     { id: 'ot-dashboard', icon: 'ti-file-invoice', label: 'Dashboard OT' },
     { id: 'asignacion', icon: 'ti-truck-delivery', label: 'Entrega a Técnico' },
     { id: 'devolucion', icon: 'ti-rotate-clockwise-2', label: 'Devolución' },
-    { id: 'reasignacion-ot', icon: 'ti-switch-horizontal', label: 'Reasignar OT' },  // ← NUEVO
+    { id: 'reasignacion-ot', icon: 'ti-switch-horizontal', label: 'Reasignar OT' },
     { id: 'movimientos', icon: 'ti-history', label: 'Movimientos' },
     { id: 'bodegas', icon: 'ti-building-warehouse', label: 'Bodegas' },
     { id: 'ot', icon: 'ti-file-invoice', label: 'Órdenes de Trabajo' },
     { id: 'carga-masiva', icon: 'ti-upload', label: 'Carga Masiva' }
 ];
+
 function Sidebar({ view, setView }) {
     return React.createElement('aside', { style: { width: 220, flexShrink: 0, background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', height: '100vh', position: 'sticky', top: 0 } },
         React.createElement('div', { style: { padding: '1.25rem 1rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 } },
@@ -105,12 +107,13 @@ function Sidebar({ view, setView }) {
 }
 
 function ErrorConexion({ onRetry }) {
+    const apiBase = typeof API_BASE !== 'undefined' ? API_BASE : 'http://localhost:3001';
     return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 16, padding: '2rem', textAlign: 'center' } },
         React.createElement('i', { className: 'ti ti-wifi-off', style: { fontSize: 48, color: 'var(--text-secondary)' }, 'aria-hidden': 'true' }),
         React.createElement('p', { style: { fontWeight: 500, fontSize: 16 } }, 'No se pudo conectar al servidor'),
         React.createElement('p', { style: { color: 'var(--text-secondary)', fontSize: 13, maxWidth: 440, lineHeight: 1.6 } },
             'Verifica que el API esté corriendo en ',
-            React.createElement('code', { style: { background: 'var(--bg-secondary)', padding: '1px 5px', borderRadius: 4 } }, API_BASE),
+            React.createElement('code', { style: { background: 'var(--bg-secondary)', padding: '1px 5px', borderRadius: 4 } }, apiBase),
             ' y que tenga CORS habilitado.'
         ),
         React.createElement('div', { style: { background: '#1e1e1e', color: '#d4d4d4', padding: '12px 18px', borderRadius: 8, fontSize: 12, textAlign: 'left', fontFamily: 'monospace', lineHeight: 1.8 } },

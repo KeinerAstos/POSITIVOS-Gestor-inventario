@@ -277,7 +277,6 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/inventario - Ingreso simplificado (sin preguntar estado)
-// POST /api/inventario - Ingreso simplificado
 router.post('/', async (req, res) => {
   let {
     material_id,
@@ -287,18 +286,15 @@ router.post('/', async (req, res) => {
     bodega_id,
     ot_id,
     usuario_asignado,
-    documento_material,   // nuevo
-    oth,                  // nuevo
-    lote                  // nuevo
+    documento_material,
+    oth,
+    lote
   } = req.body;
 
   if (!material_id || !bodega_id) {
-    return res.status(400).json({
-      error: 'material_id y bodega_id son requeridos'
-    });
+    return res.status(400).json({ error: 'material_id y bodega_id son requeridos' });
   }
 
-  // 🔍 VALIDACIÓN DE SERIALIZABLE (sin cambios)
   const materialQuery = await pool.query(
     'SELECT serializable FROM materiales WHERE codigo_sap = $1',
     [material_id]
@@ -318,9 +314,11 @@ router.post('/', async (req, res) => {
 
   ubicacion = ubicacion?.trim() || null;
   cantidad = Number(cantidad) > 0 ? Number(cantidad) : 1;
-  const estadoFinal = ot_id ? 'INGRESADO' : 'STOCK';
 
-  // Valores por defecto para los nuevos campos
+  // Determinar estado según si hay OT
+  const tieneOT = ot_id && ot_id !== '' && ot_id !== null;
+  const estadoFinal = tieneOT ? 'INGRESADO' : 'STOCK';
+
   const docMaterial = documento_material?.trim() || null;
   const othVal = oth?.trim() || null;
   const loteVal = (lote && (lote === 'VALORADO' || lote === 'NO VALORADO')) ? lote : 'NO VALORADO';
@@ -332,21 +330,98 @@ router.post('/', async (req, res) => {
 
     if (serialFinal) {
       const checkSerial = await client.query(
-        `SELECT id, serial, estado 
+        `SELECT id, material_id, estado, ot_id, ubicacion
          FROM inventario 
-         WHERE LOWER(serial) = LOWER($1) 
+         WHERE LOWER(serial) = LOWER($1)
            AND estado NOT IN ('CONSUMO')
          LIMIT 1`,
         [serialFinal]
       );
+
       if (checkSerial.rows.length > 0) {
-        return res.status(400).json({
-          error: `El número de serie '${serialFinal}' ya existe en el inventario activo.`
-        });
+        const existente = checkSerial.rows[0];
+
+        // Validar material
+        if (existente.material_id !== material_id) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: `El equipo con serie '${serialFinal}' ya tiene asignado el material '${existente.material_id}'. No se puede cambiar a '${material_id}'.`
+          });
+        }
+
+        // Si ya está en STOCK, no se permite reingreso
+        if (existente.estado === 'STOCK') {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: `El equipo con serie '${serialFinal}' ya se encuentra en bodega (STOCK). No es necesario volver a ingresarlo.`
+          });
+        }
+
+        // REINGRESO: actualizar todo
+        const updateQuery = `
+          UPDATE inventario
+          SET 
+            cantidad = $1,
+            bodega_id = $2,
+            ubicacion = $3,
+            documento_material = $4,
+            oth = $5,
+            lote = $6,
+            estado = $7,
+            ot_id = $8
+          WHERE id = $9
+          RETURNING *
+        `;
+        const updateValues = [
+          cantidad,
+          bodega_id,
+          ubicacion,
+          docMaterial,
+          othVal,
+          loteVal,
+          estadoFinal,
+          tieneOT ? ot_id : null,
+          existente.id
+        ];
+
+        const { rows: updatedRows } = await client.query(updateQuery, updateValues);
+        const equipoReingresado = updatedRows[0];
+
+        const observacionMov = `REINGRESO A BODEGA - ${material_id} - Serie: ${serialFinal} - Cantidad: ${cantidad} - Ubicación: ${ubicacion || 'N/A'} - ${tieneOT ? `OT: ${ot_id}` : 'Stock libre'}`;
+        await client.query(
+          `INSERT INTO movimientos (
+            tipo_movimiento,
+            inventario_id,
+            ot_nueva,
+            estado_anterior,
+            estado_nuevo,
+            bodega_destino_id,
+            usuario_id,
+            observacion,
+            created_at
+          ) VALUES (
+            'REINGRESO_BODEGA',
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            NOW()
+          )`,
+          [equipoReingresado.id, tieneOT ? ot_id : null, existente.estado, estadoFinal, bodega_id, usuario_asignado || 1, observacionMov]
+        );
+
+        await client.query('COMMIT');
+        console.log(`♻️ Reingreso: serie ${serialFinal}, estado ${existente.estado} → ${estadoFinal}, OT=${tieneOT ? ot_id : 'ninguna'}`);
+        return res.status(200).json(equipoReingresado);
       }
     }
 
-    // INSERT con los nuevos campos
+    // --------------------------------------------------------------
+    // INSERCIÓN NORMAL (equipo nuevo o no serializable)
+    // --------------------------------------------------------------
     const { rows } = await client.query(
       `INSERT INTO inventario (
         material_id, serial, cantidad, ot_id, usuario_asignado,
@@ -354,15 +429,13 @@ router.post('/', async (req, res) => {
         documento_material, oth, lote
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9,$10,$11)
       RETURNING *`,
-      [material_id, serialFinal, cantidad, ot_id || null, null, estadoFinal, ubicacion, bodega_id,
+      [material_id, serialFinal, cantidad, tieneOT ? ot_id : null, null, estadoFinal, ubicacion, bodega_id,
         docMaterial, othVal, loteVal]
     );
 
     const nuevoItem = rows[0];
 
-    let observacionMov = `INGRESO A BODEGA - ${material_id} ${serialFinal ? `Serie: ${serialFinal}` : ''} - Cantidad: ${cantidad}`;
-    if (ot_id) observacionMov += ` - Asociado a OT #${ot_id}`;
-    else observacionMov += ` - Stock libre`;
+    let observacionMov = `INGRESO A BODEGA - ${material_id} ${serialFinal ? `Serie: ${serialFinal}` : ''} - Cantidad: ${cantidad} - ${tieneOT ? `OT #${ot_id}` : 'STOCK LIBRE'}`;
     if (docMaterial) observacionMov += ` - Doc: ${docMaterial}`;
     if (othVal) observacionMov += ` - OTH: ${othVal}`;
 
@@ -388,11 +461,11 @@ router.post('/', async (req, res) => {
         $6,
         NOW()
       )`,
-      [nuevoItem.id, ot_id || null, estadoFinal, bodega_id, usuario_asignado || 1, observacionMov]
+      [nuevoItem.id, tieneOT ? ot_id : null, estadoFinal, bodega_id, usuario_asignado || 1, observacionMov]
     );
 
     await client.query('COMMIT');
-    console.log(`✅ Equipo ingresado: ${estadoFinal}, OT=${ot_id || 'sin OT'}`);
+    console.log(`✅ Nuevo ingreso: estado ${estadoFinal}, OT=${tieneOT ? ot_id : 'ninguna'}`);
     res.status(201).json(nuevoItem);
 
   } catch (err) {
@@ -403,7 +476,6 @@ router.post('/', async (req, res) => {
     client.release();
   }
 });
-
 // PUT /api/inventario/:id - Actualizar con registro de movimiento
 router.put('/:id', async (req, res) => {
   const { id } = req.params;

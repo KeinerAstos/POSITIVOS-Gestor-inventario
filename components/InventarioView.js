@@ -82,14 +82,25 @@ function InventarioView({ bodegas, inv, materiales, ots, setView, setTransferIte
     const filteredMaterials = getFilteredMaterials();
 
     // Filtrar inventario (para la tabla) - respeta filtros de bodega, estado y búsqueda
+    // Filtrar inventario (para la tabla) - búsqueda en todos los campos
     const filtered = listaInventario.filter(i => {
         if (fb && i.bodega_id !== parseInt(fb)) return false;
         if (fe && i.estado !== fe) return false;
         if (srch) {
             const term = srch.toLowerCase();
-            const descMatch = (i.descripcion || i.desc || i.material_id || '').toLowerCase().includes(term);
-            const serialMatch = (i.serial || '').toLowerCase().includes(term);
-            if (!descMatch && !serialMatch) return false;
+            // Reunir todos los campos relevantes en un solo string
+            const searchable = [
+                i.material_id,
+                i.material_descripcion || i.descripcion || i.desc,
+                i.serial,
+                i.documento_material,
+                i.numero_ot,
+                i.oth,
+                i.lote,
+                i.ubicacion,
+                i.estado
+            ].filter(Boolean).join(' ').toLowerCase();
+            if (!searchable.includes(term)) return false;
         }
         return true;
     });
@@ -481,7 +492,12 @@ function InventarioView({ bodegas, inv, materiales, ots, setView, setTransferIte
         React.createElement('div', { style: { ...CARD, padding: '0.75rem', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' } },
             React.createElement('div', { style: { display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0 0.5rem', borderRadius: 6, flex: 1, minWidth: 200 } },
                 React.createElement('i', { className: 'ti ti-search', style: { marginRight: 6 } }),
-                React.createElement('input', { style: { background: 'transparent', border: 'none', padding: '6px 0' }, placeholder: 'Buscar por material o serie...', value: srch, onChange: e => setSrch(e.target.value) })
+                React.createElement('input', {
+                    style: { background: 'transparent', border: 'none', padding: '6px 0' },
+                    placeholder: 'Buscar por cualquier campo (material, serie, OT, lote, doc, OTH, ubicación, estado)...',
+                    value: srch,
+                    onChange: e => setSrch(e.target.value)
+                })
             ),
             React.createElement('select', { style: { width: 'auto', minWidth: 160 }, value: fb, onChange: e => setFb(e.target.value) },
                 React.createElement('option', { value: '' }, 'Todas las bodegas'),
