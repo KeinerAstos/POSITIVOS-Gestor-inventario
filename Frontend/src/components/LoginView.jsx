@@ -9,7 +9,6 @@ export default function LoginView({ onLogin }) {
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
-<<<<<<< HEAD
     e.preventDefault();
     if (!form.cedula || !form.password) {
       setError('Completa todos los campos');
@@ -17,11 +16,6 @@ export default function LoginView({ onLogin }) {
     }
     setLoading(true);
     setError('');
-=======
-    e?.preventDefault();
-    if (!form.cedula || !form.password) { setError('Completa todos los campos'); return; }
-    setLoading(true); setError('');
->>>>>>> 81c0c5afa872175541beee3016e603c9d33cb973
     try {
       const data = await http.post('/auth/login', {
         cedula: form.cedula,
@@ -61,18 +55,10 @@ export default function LoginView({ onLogin }) {
             <div className="input-icon-wrapper">
               <i className="ti ti-id input-icon" />
               <input
-<<<<<<< HEAD
                 type="text"
                 value={form.cedula}
                 onChange={(e) => setForm({ ...form, cedula: e.target.value })}
                 placeholder="Número de identificación"
-=======
-                value={form.cedula}
-                onChange={e => setForm(p => ({ ...p, cedula: e.target.value }))}
-                placeholder="Tu nombre de usuario o cedula"
-                style={{ paddingLeft: 34 }}
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
->>>>>>> 81c0c5afa872175541beee3016e603c9d33cb973
               />
             </div>
           </div>

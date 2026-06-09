@@ -101,7 +101,7 @@ function Sidebar({ view, setView }) {
         ),
         React.createElement('div', { style: { padding: '0.75rem 1rem', borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5 } },
             React.createElement('i', { className: 'ti ti-circle-check', style: { fontSize: 13, color: '#3B6D11' }, 'aria-hidden': 'true' }),
-            'Conectado · ', React.createElement('code', { style: { fontSize: 10 } }, 'localhost:3000')
+            'Conectado · ', React.createElement('code', { style: { fontSize: 10 } }, 'localhost:3001')
         )
     );
 }

@@ -1,24 +1,10 @@
 const { Pool } = require('pg');
 const pool = new Pool({
   host:     process.env.DB_HOST     || 'localhost',
-  port:     process.env.DB_PORT     || 5433,
-  database: process.env.DB_NAME     || 'str',
+  port:     process.env.DB_PORT     || 5432,
+  database: process.env.DB_NAME     || 'rake2',
   user:     process.env.DB_USER     || 'postgres',
-<<<<<<< HEAD
-  password: process.env.DB_PASSWORD || '123456789',
-=======
-  password: process.env.DB_PASSWORD || 'ñññññññ',
-});
-
-// ← agrega esto temporalmente
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('❌ Error conectando a PostgreSQL:', err.message);
-  } else {
-    console.log('✅ Conectado a PostgreSQL correctamente');
-    release();
-  }
->>>>>>> 81c0c5afa872175541beee3016e603c9d33cb973
+  password: process.env.DB_PASSWORD || '123456',
 });
 
 pool.on('error', (err) => {

@@ -47,7 +47,7 @@ function Topbar({ view, user, collapsed }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--text-muted)' }}>
         <i className="ti ti-server" style={{ fontSize: 14 }} />
-        <span>localhost:3000</span>
+        <span>localhost:3001</span>
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E' }} />
       </div>
     </div>
@@ -74,9 +74,23 @@ export default function App() {
   useEffect(() => {
     const t = localStorage.getItem('token');
     const u = localStorage.getItem('user');
+
     if (t && u) {
-      try { setToken(t); setUser(JSON.parse(u)); }
-      catch { localStorage.clear(); }
+      try {
+        const parsedUser = JSON.parse(u);
+        const rol = String(parsedUser?.rol || parsedUser?.tipo || '').toLowerCase().trim();
+
+        setToken(t);
+        setUser(parsedUser);
+
+        if (rol === 'tecnico') {
+          setView('tecnico');
+        } else {
+          setView('dashboard');
+        }
+      } catch {
+        localStorage.clear();
+      }
     }
   }, []);
 
@@ -115,7 +129,8 @@ export default function App() {
     localStorage.setItem('user', JSON.stringify(u));
     window.CURRENT_USER_ID = u?.id;
     // Redirigir según rol
-    if (u?.tipo === 'tecnico') setView('tecnico');
+    const rol = String(u?.rol || u?.tipo || '').toLowerCase().trim();
+    if (rol === 'tecnico') setView('tecnico');
     else setView('dashboard');
   };
 
@@ -154,7 +169,10 @@ export default function App() {
 
   /* ── nav guard: técnico solo ve su vista ── */
   const handleSetView = (v) => {
-    if (user?.tipo === 'tecnico' && v !== 'tecnico') return;
+    const rol = String(user?.rol || user?.tipo || '').toLowerCase().trim();
+
+    if (rol === 'tecnico' && v !== 'tecnico') return;
+
     setView(v);
   };
 
