@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { http, fmtFecha } from '../api.js';
 import { Card, CardHeader, Btn, Badge, PageHeader, EmptyState, Loading } from './UI.jsx';
 import FormularioActaQA from './FormularioActaQA.jsx';
-import { FORMATOS_QA } from '../config/formatosqa.js';
+import { FORMATOS_QA } from '../config/formatosQa.js';
 
 export default function TecnicoView({ user, token, refresh: refreshParent }) {
   const [equipos, setEquipos]       = useState([]);
