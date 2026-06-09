@@ -75,7 +75,7 @@ router.post('/asignar', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Procesar equipos serializados (sin cambios)
+    // ========== 1. EQUIPOS SERIALIZADOS ==========
     if (Array.isArray(inventario_ids) && inventario_ids.length > 0) {
       for (const id of inventario_ids) {
         const { rows } = await client.query(
@@ -100,6 +100,7 @@ router.post('/asignar', async (req, res) => {
           );
         }
 
+        // Serializado: siempre actualizar el mismo registro (cantidad=1)
         await client.query(
           `UPDATE inventario
            SET estado = 'TERRENO',
@@ -112,113 +113,112 @@ router.post('/asignar', async (req, res) => {
 
         await client.query(
           `INSERT INTO movimientos (
-            tipo_movimiento,
-            inventario_id,
-            ot_anterior,
-            ot_nueva,
-            estado_anterior,
-            estado_nuevo,
-            bodega_origen_id,
-            usuario_id,
-            tecnico_id,
-            observacion,
-            created_at
+            tipo_movimiento, inventario_id, ot_anterior, ot_nueva,
+            estado_anterior, estado_nuevo, bodega_origen_id,
+            usuario_id, tecnico_id, observacion, created_at
           ) VALUES (
-            'ASIGNACION_TERRENO',
-            $1,
-            $2,
-            $3,
-            $4,
-            'TERRENO',
-            $5,
-            $6,
-            $7,
-            $8,
-            NOW()
+            'ASIGNACION_TERRENO', $1, $2, $3, $4, 'TERRENO', $5, $6, $7, $8, NOW()
           )`,
-          [
-            id,
-            item.ot_id,
-            ot_id || null,
-            item.estado,
-            item.bodega_id,
-            tecnico,
-            tecnico,
-            observacion || `Asignación a técnico ID: ${tecnico} - Equipo enviado a terreno`
-          ]
+          [id, item.ot_id, ot_id || null, item.estado, item.bodega_id,
+            tecnico, tecnico, observacion || `Asignación a técnico ID: ${tecnico} - Equipo enviado a terreno`]
         );
 
         console.log(`✅ Equipo ${id} asignado a técnico - estado: TERRENO`);
       }
     }
 
-    // Procesar materiales no serializados (MODIFICADO: ahora pasan a TERRENO)
-    // Procesar materiales no serializados (AHORA PASAN A TERRENO)
+    // ========== 2. MATERIALES NO SERIALIZADOS ==========
     if (Array.isArray(materiales_no_serializados) && materiales_no_serializados.length > 0) {
       for (const mat of materiales_no_serializados) {
         const inventario_id = Number(mat.inventario_id);
-        let cant = Number(mat.cantidad_descontar);
+        let cantidadAsignar = Number(mat.cantidad_descontar);
 
-        // ✅ VALIDACIÓN ESTRICTA
-        if (!inventario_id || isNaN(cant) || !Number.isInteger(cant) || cant < 1) {
-          console.log(`⚠️ Cantidad inválida (${cant}) para material ID ${inventario_id}. Se omite.`);
+        if (!inventario_id || isNaN(cantidadAsignar) || !Number.isInteger(cantidadAsignar) || cantidadAsignar < 1) {
+          console.log(`⚠️ Cantidad inválida (${cantidadAsignar}) para material ID ${inventario_id}. Se omite.`);
           continue;
         }
 
         const { rows } = await client.query(
-          `SELECT cantidad, bodega_id, material_id
-       FROM inventario 
-       WHERE id = $1 AND serial IS NULL
-       FOR UPDATE`,
+          `SELECT cantidad, bodega_id, material_id, documento_material, oth, lote, ubicacion, estado, ot_id
+           FROM inventario 
+           WHERE id = $1 AND (serial IS NULL OR serial = '')
+           FOR UPDATE`,
           [inventario_id]
         );
+        
         if (rows.length === 0) {
           throw new Error(`El material ID ${inventario_id} no es un consumible válido.`);
         }
+        
         const currentStock = rows[0];
-        if (Number(currentStock.cantidad) < cant) {
-          throw new Error(`Stock insuficiente. Disponibles: ${currentStock.cantidad}.`);
+        if (Number(currentStock.cantidad) < cantidadAsignar) {
+          throw new Error(`Stock insuficiente para material ID ${inventario_id}. Disponibles: ${currentStock.cantidad}, solicitados: ${cantidadAsignar}`);
         }
 
-        // Descontar stock
-        await client.query(
-          `UPDATE inventario 
-       SET cantidad = cantidad - $2 
-       WHERE id = $1`,
-          [inventario_id, cant]
-        );
+        const esAsignacionTotal = (cantidadAsignar === Number(currentStock.cantidad));
 
-        // Crear NUEVO registro con estado TERRENO (cantidad debe ser >=1)
-        const insertResult = await client.query(
-          `INSERT INTO inventario (
-        material_id, cantidad, ot_id, usuario_asignado,
-        estado, bodega_id, created_at
-      )
-      SELECT
-        material_id, $2, $3, $4,
-        'TERRENO',
-        bodega_id, NOW()
-      FROM inventario
-      WHERE id = $1
-      RETURNING id`,
-          [inventario_id, cant, ot_id || null, tecnico]
-        );
-        const nuevoId = insertResult.rows[0].id;
+        if (esAsignacionTotal) {
+          // ✅ ASIGNACIÓN TOTAL: actualizar el mismo registro a TERRENO (no duplicar)
+          await client.query(
+            `UPDATE inventario
+             SET estado = 'TERRENO',
+                 ot_id = $2,
+                 usuario_asignado = $3,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [inventario_id, ot_id || null, tecnico]
+          );
 
-        // Registrar movimiento
-        await client.query(
-          `INSERT INTO movimientos (
-        tipo_movimiento, inventario_id, ot_nueva, estado_anterior,
-        estado_nuevo, bodega_origen_id, usuario_id, tecnico_id,
-        observacion, created_at
-      ) VALUES (
-        'ASIGNACION_TERRENO', $1, $2, 'STOCK', 'TERRENO', $3, $4, $5, $6, NOW()
-      )`,
-          [nuevoId, ot_id || null, currentStock.bodega_id, tecnico, tecnico,
-            observacion || `Asignación de material a técnico ID: ${tecnico} - Cantidad: ${cant}`]
-        );
+          // Registrar movimiento en el mismo ID
+          await client.query(
+            `INSERT INTO movimientos (
+              tipo_movimiento, inventario_id, ot_nueva, estado_anterior,
+              estado_nuevo, bodega_origen_id, usuario_id, tecnico_id, observacion, created_at
+            ) VALUES (
+              'ASIGNACION_TERRENO', $1, $2, $3, 'TERRENO', $4, $5, $6, $7, NOW()
+            )`,
+            [inventario_id, ot_id || null, currentStock.estado, currentStock.bodega_id,
+              tecnico, tecnico, observacion || `Asignación total de material a técnico ID: ${tecnico} - Cantidad: ${cantidadAsignar}`]
+          );
 
-        console.log(`✅ Material ${inventario_id}: se entregaron ${cant} unidades en estado TERRENO (nuevo ID: ${nuevoId})`);
+          console.log(`✅ Material ${inventario_id}: asignación TOTAL (${cantidadAsignar} uds) → estado TERRENO, mismo ID`);
+
+        } else {
+          // ✅ ASIGNACIÓN PARCIAL: reducir el original y crear nuevo registro en TERRENO
+          await client.query(
+            `UPDATE inventario SET cantidad = cantidad - $1 WHERE id = $2`,
+            [cantidadAsignar, inventario_id]
+          );
+
+          // Crear nuevo registro en TERRENO copiando todos los metadatos
+          const insertResult = await client.query(
+            `INSERT INTO inventario (
+              material_id, cantidad, ot_id, usuario_asignado, estado, bodega_id,
+              documento_material, oth, lote, ubicacion, created_at
+            )
+            SELECT
+              material_id, $1, $2, $3, 'TERRENO', bodega_id,
+              documento_material, oth, lote, ubicacion, NOW()
+            FROM inventario WHERE id = $4
+            RETURNING id`,
+            [cantidadAsignar, ot_id || null, tecnico, inventario_id]
+          );
+          const nuevoId = insertResult.rows[0].id;
+
+          // Registrar movimiento del nuevo registro
+          await client.query(
+            `INSERT INTO movimientos (
+              tipo_movimiento, inventario_id, ot_nueva, estado_anterior,
+              estado_nuevo, bodega_origen_id, usuario_id, tecnico_id, observacion, created_at
+            ) VALUES (
+              'ASIGNACION_TERRENO', $1, $2, 'STOCK', 'TERRENO', $3, $4, $5, $6, NOW()
+            )`,
+            [nuevoId, ot_id || null, currentStock.bodega_id, tecnico, tecnico,
+              observacion || `Asignación parcial de ${cantidadAsignar} unidades a técnico ID: ${tecnico}`]
+          );
+
+          console.log(`✅ Material ${inventario_id}: asignación PARCIAL (${cantidadAsignar} uds) → nuevo ID ${nuevoId} en TERRENO, stock original reducido a ${currentStock.cantidad - cantidadAsignar}`);
+        }
       }
     }
 
@@ -240,7 +240,6 @@ router.post('/asignar', async (req, res) => {
     client.release();
   }
 });
-
 router.get('/', async (req, res) => {
   const { bodega_id, estado, material_id } = req.query;
   const filtros = [];
