@@ -92,9 +92,17 @@ export default function Sidebar({ view, setView, user, onLogout, collapsed, setC
         </div>
         {!collapsed && (
           <>
+<<<<<<< HEAD
             <div className="user-info">
               <div className="user-name">{user?.nombre || 'Usuario'}</div>
               <div className="user-role">{user?.rol || 'admin'}</div>
+=======
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user?.nombre || 'Usuario'}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user?.tipo || 'admin'}</div>
+>>>>>>> 81c0c5afa872175541beee3016e603c9d33cb973
             </div>
             <button onClick={onLogout} title="Cerrar sesión" className="logout-btn">
               <i className="ti ti-logout logout-icon" />
