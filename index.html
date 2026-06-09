@@ -111,7 +111,7 @@
 
     <script>
         // ========== CONFIGURACIÓN GLOBAL ==========
-        const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api';
+        const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
         const http = {
             get: async (url, token) => {
@@ -298,11 +298,18 @@
 
             React.useEffect(() => {
                 if (user) {
-                    const tipo = normalizarTipo(user.tipo || user.tipo_usuario || '');
-                    if (tipo !== 'TECNICO' && tipo !== 'CONTROL_CALIDAD') {
-                        loadAdminData();
+                    const rol = normalizarTipo(
+                    user.rol ||
+                    user.tipo ||
+                    user.tipo_usuario ||
+                    user.role ||
+                    ''
+                    );
+
+                    if (rol !== 'TECNICO' && rol !== 'CONTROL_CALIDAD') {
+                    loadAdminData();
                     } else {
-                        setLoading(false);
+                    setLoading(false);
                     }
                 }
             }, [user]);

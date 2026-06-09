@@ -1,0 +1,164 @@
+/* LoginView.css - Positivo S+ con acento verde */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #F5F7FA 0%, #E9EEF2 100%);
+  position: relative;
+}
+
+.login-grid-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle at 10% 20%, rgba(16,212,81,0.05) 2px, transparent 2px);
+  background-size: 30px 30px;
+}
+
+.login-card-wrapper {
+  width: 100%;
+  max-width: 420px;
+  padding: 0 20px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Logo Positivo S+ */
+.login-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.logo-circle {
+  width: 80px;
+  height: 80px;
+  background: #10D451;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(16,212,81,0.3);
+}
+
+.logo-circle i {
+  font-size: 44px;
+  color: white;
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1E2A3A;
+  letter-spacing: -0.3px;
+  margin: 16px 0 4px;
+}
+
+.login-subtitle {
+  color: #6B7A8A;
+  font-size: 14px;
+  margin-top: 0;
+}
+
+/* Tarjeta blanca */
+.login-form-card {
+  background: white;
+  border-radius: 24px;
+  padding: 36px 32px;
+  box-shadow: 0 20px 35px -12px rgba(0,0,0,0.1);
+  border: 1px solid rgba(161,173,173,0.2);
+}
+
+.login-form-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1E2A3A;
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.input-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #10D451;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.input-icon-wrapper {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #A1ADAD;
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.input-icon-wrapper input {
+  width: 100%;
+  padding: 12px 12px 12px 44px;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  font-size: 15px;
+  background: white;
+  transition: all 0.2s;
+}
+
+.input-icon-wrapper input:focus {
+  border-color: #10D451;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16,212,81,0.1);
+}
+
+.login-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 12px !important;
+  background: #10D451 !important;
+  color: white !important;
+  font-weight: 600 !important;
+  border-radius: 40px !important;
+  margin-top: 8px;
+  border: none;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.login-btn:hover {
+  background: #0BA843 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(16,212,81,0.3);
+}
+
+.login-footer {
+  text-align: center;
+  font-size: 11px;
+  color: #A1ADAD;
+  margin-top: 24px;
+}
+
+.login-extra {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 13px;
+}
+
+.login-extra a {
+  color: #10D451;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-extra a:hover {
+  text-decoration: underline;
+}

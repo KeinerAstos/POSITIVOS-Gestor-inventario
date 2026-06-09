@@ -1,0 +1,112 @@
+/* BodegasView.css */
+.bodegas-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bodegas-form-card {
+  margin-bottom: 20px;
+}
+
+.bodegas-card-body {
+  padding: 20px;
+}
+
+.bodegas-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.bodegas-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.bodegas-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.bodegas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.bodegas-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.bodegas-card-inactive {
+  opacity: 0.6;
+}
+
+.bodegas-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.bodegas-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(217, 119, 6, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+
+.bodegas-card-icon i {
+  font-size: 20px;
+  color: var(--amber-glow, #f59e0b);
+}
+
+.bodegas-card-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.bodegas-card-subtitle {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+}
+
+.bodegas-card-stats {
+  display: flex;
+  gap: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.bodegas-stat-label {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+}
+
+.bodegas-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.bodegas-stat-disponible {
+  color: #22c55e;
+}
+
+.bodegas-stat-responsable {
+  font-size: 13px;
+  font-weight: 500;
+}
