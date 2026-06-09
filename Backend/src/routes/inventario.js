@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
@@ -277,7 +276,6 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/inventario - Ingreso simplificado (sin preguntar estado)
-// POST /api/inventario - Ingreso simplificado
 router.post('/', async (req, res) => {
   let {
     material_id,
@@ -287,18 +285,15 @@ router.post('/', async (req, res) => {
     bodega_id,
     ot_id,
     usuario_asignado,
-    documento_material,   // nuevo
-    oth,                  // nuevo
-    lote                  // nuevo
+    documento_material,
+    oth,
+    lote
   } = req.body;
 
   if (!material_id || !bodega_id) {
-    return res.status(400).json({
-      error: 'material_id y bodega_id son requeridos'
-    });
+    return res.status(400).json({ error: 'material_id y bodega_id son requeridos' });
   }
 
-  // 🔍 VALIDACIÓN DE SERIALIZABLE (sin cambios)
   const materialQuery = await pool.query(
     'SELECT serializable FROM materiales WHERE codigo_sap = $1',
     [material_id]
@@ -318,9 +313,11 @@ router.post('/', async (req, res) => {
 
   ubicacion = ubicacion?.trim() || null;
   cantidad = Number(cantidad) > 0 ? Number(cantidad) : 1;
-  const estadoFinal = ot_id ? 'INGRESADO' : 'STOCK';
 
-  // Valores por defecto para los nuevos campos
+  // Determinar estado según si hay OT
+  const tieneOT = ot_id && ot_id !== '' && ot_id !== null;
+  const estadoFinal = tieneOT ? 'INGRESADO' : 'STOCK';
+
   const docMaterial = documento_material?.trim() || null;
   const othVal = oth?.trim() || null;
   const loteVal = (lote && (lote === 'VALORADO' || lote === 'NO VALORADO')) ? lote : 'NO VALORADO';
@@ -332,21 +329,98 @@ router.post('/', async (req, res) => {
 
     if (serialFinal) {
       const checkSerial = await client.query(
-        `SELECT id, serial, estado 
+        `SELECT id, material_id, estado, ot_id, ubicacion
          FROM inventario 
-         WHERE LOWER(serial) = LOWER($1) 
+         WHERE LOWER(serial) = LOWER($1)
            AND estado NOT IN ('CONSUMO')
          LIMIT 1`,
         [serialFinal]
       );
+
       if (checkSerial.rows.length > 0) {
-        return res.status(400).json({
-          error: `El número de serie '${serialFinal}' ya existe en el inventario activo.`
-        });
+        const existente = checkSerial.rows[0];
+
+        // Validar material
+        if (existente.material_id !== material_id) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: `El equipo con serie '${serialFinal}' ya tiene asignado el material '${existente.material_id}'. No se puede cambiar a '${material_id}'.`
+          });
+        }
+
+        // Si ya está en STOCK, no se permite reingreso
+        if (existente.estado === 'STOCK') {
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            error: `El equipo con serie '${serialFinal}' ya se encuentra en bodega (STOCK). No es necesario volver a ingresarlo.`
+          });
+        }
+
+        // REINGRESO: actualizar todo
+        const updateQuery = `
+          UPDATE inventario
+          SET 
+            cantidad = $1,
+            bodega_id = $2,
+            ubicacion = $3,
+            documento_material = $4,
+            oth = $5,
+            lote = $6,
+            estado = $7,
+            ot_id = $8
+          WHERE id = $9
+          RETURNING *
+        `;
+        const updateValues = [
+          cantidad,
+          bodega_id,
+          ubicacion,
+          docMaterial,
+          othVal,
+          loteVal,
+          estadoFinal,
+          tieneOT ? ot_id : null,
+          existente.id
+        ];
+
+        const { rows: updatedRows } = await client.query(updateQuery, updateValues);
+        const equipoReingresado = updatedRows[0];
+
+        const observacionMov = `REINGRESO A BODEGA - ${material_id} - Serie: ${serialFinal} - Cantidad: ${cantidad} - Ubicación: ${ubicacion || 'N/A'} - ${tieneOT ? `OT: ${ot_id}` : 'Stock libre'}`;
+        await client.query(
+          `INSERT INTO movimientos (
+            tipo_movimiento,
+            inventario_id,
+            ot_nueva,
+            estado_anterior,
+            estado_nuevo,
+            bodega_destino_id,
+            usuario_id,
+            observacion,
+            created_at
+          ) VALUES (
+            'REINGRESO_BODEGA',
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            NOW()
+          )`,
+          [equipoReingresado.id, tieneOT ? ot_id : null, existente.estado, estadoFinal, bodega_id, usuario_asignado || 1, observacionMov]
+        );
+
+        await client.query('COMMIT');
+        console.log(`♻️ Reingreso: serie ${serialFinal}, estado ${existente.estado} → ${estadoFinal}, OT=${tieneOT ? ot_id : 'ninguna'}`);
+        return res.status(200).json(equipoReingresado);
       }
     }
 
-    // INSERT con los nuevos campos
+    // --------------------------------------------------------------
+    // INSERCIÓN NORMAL (equipo nuevo o no serializable)
+    // --------------------------------------------------------------
     const { rows } = await client.query(
       `INSERT INTO inventario (
         material_id, serial, cantidad, ot_id, usuario_asignado,
@@ -354,15 +428,13 @@ router.post('/', async (req, res) => {
         documento_material, oth, lote
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9,$10,$11)
       RETURNING *`,
-      [material_id, serialFinal, cantidad, ot_id || null, null, estadoFinal, ubicacion, bodega_id,
+      [material_id, serialFinal, cantidad, tieneOT ? ot_id : null, null, estadoFinal, ubicacion, bodega_id,
         docMaterial, othVal, loteVal]
     );
 
     const nuevoItem = rows[0];
 
-    let observacionMov = `INGRESO A BODEGA - ${material_id} ${serialFinal ? `Serie: ${serialFinal}` : ''} - Cantidad: ${cantidad}`;
-    if (ot_id) observacionMov += ` - Asociado a OT #${ot_id}`;
-    else observacionMov += ` - Stock libre`;
+    let observacionMov = `INGRESO A BODEGA - ${material_id} ${serialFinal ? `Serie: ${serialFinal}` : ''} - Cantidad: ${cantidad} - ${tieneOT ? `OT #${ot_id}` : 'STOCK LIBRE'}`;
     if (docMaterial) observacionMov += ` - Doc: ${docMaterial}`;
     if (othVal) observacionMov += ` - OTH: ${othVal}`;
 
@@ -388,11 +460,11 @@ router.post('/', async (req, res) => {
         $6,
         NOW()
       )`,
-      [nuevoItem.id, ot_id || null, estadoFinal, bodega_id, usuario_asignado || 1, observacionMov]
+      [nuevoItem.id, tieneOT ? ot_id : null, estadoFinal, bodega_id, usuario_asignado || 1, observacionMov]
     );
 
     await client.query('COMMIT');
-    console.log(`✅ Equipo ingresado: ${estadoFinal}, OT=${ot_id || 'sin OT'}`);
+    console.log(`✅ Nuevo ingreso: estado ${estadoFinal}, OT=${tieneOT ? ot_id : 'ninguna'}`);
     res.status(201).json(nuevoItem);
 
   } catch (err) {
@@ -403,7 +475,6 @@ router.post('/', async (req, res) => {
     client.release();
   }
 });
-
 // PUT /api/inventario/:id - Actualizar con registro de movimiento
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
@@ -516,111 +587,152 @@ router.post('/devolver-bodega', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Obtener el elemento (equipo o material)
+    // Obtener el elemento (equipo o material) con bloqueo
     const { rows } = await client.query(
-      `SELECT id, estado, ot_id, bodega_id, material_id, serial, cantidad
-             FROM inventario 
-             WHERE id = $1 
-             FOR UPDATE`,
+      `SELECT id, estado, ot_id, bodega_id, material_id, serial, cantidad,
+              documento_material, oth, lote, ubicacion
+       FROM inventario 
+       WHERE id = $1 
+       FOR UPDATE`,
       [inventario_id]
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Elemento no encontrado' });
     }
     const item = rows[0];
+
+    // Validación: solo elementos en TERRENO
     if (item.estado !== 'TERRENO') {
       return res.status(400).json({ error: 'Solo elementos en TERRENO pueden devolverse' });
     }
 
+    // Determinar cantidad a devolver
     let cantidadADevolver = (cantidad_devolver !== undefined) ? cantidad_devolver : item.cantidad;
     if (cantidadADevolver <= 0 || cantidadADevolver > item.cantidad) {
       return res.status(400).json({ error: 'Cantidad a devolver inválida' });
     }
 
-    const esSerializable = item.serial !== null;
+    const esSerializable = (item.serial !== null && item.serial !== '');
+    const estadoNuevo = conservar_ot ? 'INGRESADO' : 'STOCK';
+    const esDevolucionTotal = (cantidadADevolver === item.cantidad);
 
     if (esSerializable) {
-      // Equipo serializado: debe devolverse entero (cantidad=1)
+      // ========== EQUIPO SERIALIZADO ==========
       if (cantidadADevolver !== 1) {
         return res.status(400).json({ error: 'Para equipos serializados la cantidad a devolver debe ser 1' });
       }
-      const estadoFinal = conservar_ot ? 'INGRESADO' : 'STOCK';
+
+      // Actualizar el mismo registro
       await client.query(
         `UPDATE inventario 
-                 SET estado = $1,
-                     usuario_asignado = NULL,
-                     ot_id = $2
-                 WHERE id = $3`,
-        [estadoFinal, conservar_ot ? item.ot_id : null, inventario_id]
+         SET estado = $1,
+             usuario_asignado = NULL,
+             ot_id = $2,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [estadoNuevo, conservar_ot ? item.ot_id : null, inventario_id]
       );
+
+      // Registrar movimiento
       await client.query(
         `INSERT INTO movimientos (
-                    tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
-                    estado_nuevo, bodega_destino_id, observacion, created_at
-                ) VALUES (
-                    'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', $3, $4, $5, NOW()
-                )`,
-        [inventario_id, item.ot_id, estadoFinal, item.bodega_id, observacion || 'Devolución a bodega']
+          tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+          estado_nuevo, bodega_destino_id, observacion, created_at
+        ) VALUES (
+          'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', $3, $4, $5, NOW()
+        )`,
+        [inventario_id, item.ot_id, estadoNuevo, item.bodega_id, observacion || 'Devolución de equipo a bodega']
       );
-    } else {
-      // Material no serializado: reintegrar al stock original
-      // Buscar registro de stock existente (mismo material, bodega, sin serial, misma OT si conservar_ot)
-      let stockQuery = `
-                SELECT id, cantidad
-                FROM inventario 
-                WHERE material_id = $1 
-                  AND bodega_id = $2 
-                  AND serial IS NULL
-            `;
-      const params = [item.material_id, item.bodega_id];
-      if (conservar_ot) {
-        stockQuery += ` AND ot_id = $3`;
-        params.push(item.ot_id);
-      } else {
-        stockQuery += ` AND (ot_id IS NULL OR ot_id = 0)`;
-      }
-      const { rows: stockRows } = await client.query(stockQuery, params);
-      let stockId;
-      if (stockRows.length > 0) {
-        stockId = stockRows[0].id;
-        await client.query(
-          `UPDATE inventario SET cantidad = cantidad + $1 WHERE id = $2`,
-          [cantidadADevolver, stockId]
-        );
-      } else {
-        const estadoStock = conservar_ot ? 'INGRESADO' : 'STOCK';
-        const insertRes = await client.query(
-          `INSERT INTO inventario (material_id, cantidad, ot_id, estado, bodega_id, created_at)
-                     VALUES ($1, $2, $3, $4, $5, NOW())
-                     RETURNING id`,
-          [item.material_id, cantidadADevolver, conservar_ot ? item.ot_id : null, estadoStock, item.bodega_id]
-        );
-        stockId = insertRes.rows[0].id;
-      }
 
-      // Reducir o eliminar el registro en TERRENO
-      if (cantidadADevolver === item.cantidad) {
-        await client.query(`DELETE FROM inventario WHERE id = $1`, [inventario_id]);
+    } else {
+      // ========== MATERIAL NO SERIALIZADO ==========
+      if (esDevolucionTotal) {
+        // ✅ Devolución total: solo cambiar estado (y opcionalmente liberar OT)
+        await client.query(
+          `UPDATE inventario
+           SET estado = $1,
+               ot_id = $2,
+               usuario_asignado = NULL,
+               updated_at = NOW()
+           WHERE id = $3`,
+          [estadoNuevo, conservar_ot ? item.ot_id : null, inventario_id]
+        );
+
+        await client.query(
+          `INSERT INTO movimientos (
+            tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+            estado_nuevo, bodega_destino_id, observacion, created_at
+          ) VALUES (
+            'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', $3, $4, $5, NOW()
+          )`,
+          [inventario_id, item.ot_id, estadoNuevo, item.bodega_id, observacion || 'Devolución total de material a bodega']
+        );
+
       } else {
+        // ✅ Devolución parcial: restar del original y acumular en stock (o crear nuevo registro)
+        
+        // Buscar registro de stock compatible (mismo material, bodega, sin serial, misma OT si conservar_ot)
+        let stockQuery = `
+          SELECT id, cantidad
+          FROM inventario
+          WHERE material_id = $1
+            AND bodega_id = $2
+            AND (serial IS NULL OR serial = '')
+        `;
+        const params = [item.material_id, item.bodega_id];
+        if (conservar_ot) {
+          stockQuery += ` AND ot_id = $3`;
+          params.push(item.ot_id);
+        } else {
+          stockQuery += ` AND (ot_id IS NULL OR ot_id = 0)`;
+        }
+
+        const { rows: stockRows } = await client.query(stockQuery, params);
+
+        if (stockRows.length > 0) {
+          // Actualizar stock existente
+          const stockId = stockRows[0].id;
+          await client.query(
+            `UPDATE inventario SET cantidad = cantidad + $1 WHERE id = $2`,
+            [cantidadADevolver, stockId]
+          );
+        } else {
+          // Crear nuevo registro de stock copiando metadatos del original
+          await client.query(
+            `INSERT INTO inventario (
+              material_id, cantidad, ot_id, estado, bodega_id,
+              documento_material, oth, lote, ubicacion, created_at
+            )
+            SELECT
+              material_id, $1, $2, $3, $4,
+              documento_material, oth, lote, ubicacion, NOW()
+            FROM inventario WHERE id = $5`,
+            [cantidadADevolver, conservar_ot ? item.ot_id : null, estadoNuevo, item.bodega_id, inventario_id]
+          );
+        }
+
+        // Reducir la cantidad del registro original (que sigue en TERRENO)
         await client.query(
           `UPDATE inventario SET cantidad = cantidad - $1 WHERE id = $2`,
           [cantidadADevolver, inventario_id]
         );
-      }
 
-      await client.query(
-        `INSERT INTO movimientos (
-                    tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
-                    estado_nuevo, bodega_destino_id, observacion, created_at
-                ) VALUES (
-                    'DEVOLUCION_MATERIAL', $1, $2, 'TERRENO', 'STOCK', $3, $4, NOW()
-                )`,
-        [inventario_id, item.ot_id, item.bodega_id, observacion || 'Devolución de material a bodega']
-      );
+        // Registrar movimiento parcial (estado_nuevo = 'TERRENO' porque el registro original sigue en terreno)
+        await client.query(
+          `INSERT INTO movimientos (
+            tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+            estado_nuevo, bodega_destino_id, observacion, created_at
+          ) VALUES (
+            'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', 'TERRENO', $3, $4, NOW()
+          )`,
+          [inventario_id, item.ot_id, item.bodega_id, observacion || `Devolución parcial de ${cantidadADevolver} unidades a bodega`]
+        );
+      }
     }
 
     await client.query('COMMIT');
     res.json({ success: true, message: 'Devolución procesada correctamente' });
+
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error en devolución:', err);

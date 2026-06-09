@@ -1,0 +1,254 @@
+/* Sidebar.css - Estilos para el menú lateral */
+
+.sidebar {
+  flex-shrink: 0;
+  background: var(--bg-sidebar, #FFFFFF);
+  border-right: 1px solid var(--border, rgba(161,173,173,0.2));
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.sidebar-collapsed {
+  width: 64px;
+}
+
+.sidebar-expanded {
+  width: 240px;
+}
+
+/* Logo area */
+.sidebar-logo {
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--border, rgba(161,173,173,0.2));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  min-height: 64px;
+}
+
+.sidebar-logo-collapsed {
+  justify-content: center;
+  padding: 18px 0;
+}
+
+.logo-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #10D451, #0BA843);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 16px rgba(16,212,81,0.4);
+}
+
+.logo-icon i {
+  font-size: 18px;
+  color: white;
+}
+
+.logo-text {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text-primary, #1E2A3A);
+  letter-spacing: -0.01em;
+}
+
+.logo-sub {
+  font-size: 10px;
+  color: var(--text-muted, #6B7A8A);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #6B7A8A);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.collapse-btn-icon {
+  font-size: 18px;
+}
+
+/* Expand button when collapsed */
+.expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #6B7A8A);
+  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.expand-btn-icon {
+  font-size: 18px;
+}
+
+/* Navigation */
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-nav-collapsed {
+  padding: 8px 8px;
+}
+
+.sidebar-nav-expanded {
+  padding: 12px 10px;
+}
+
+.nav-group {
+  margin-bottom: 8px;
+}
+
+.nav-group-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted, #6B7A8A);
+  padding: 6px 8px 4px;
+  margin-top: 4px;
+}
+
+.nav-spacer {
+  height: 8px;
+}
+
+.nav-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 2px;
+  transition: all 0.15s;
+  white-space: nowrap;
+  background: transparent;
+}
+
+.nav-item-collapsed {
+  padding: 9px;
+  justify-content: center;
+}
+
+.nav-item-expanded {
+  padding: 8px 10px;
+  justify-content: flex-start;
+}
+
+.nav-item-active {
+  background: linear-gradient(135deg, rgba(16,212,81,0.2), rgba(11,168,67,0.1));
+  color: #10D451;
+  font-weight: 600;
+  border-left: 2px solid #10D451;
+}
+
+.nav-item-inactive {
+  background: transparent;
+  color: var(--text-secondary, #5A6B7A);
+  font-weight: 400;
+  border-left: 2px solid transparent;
+}
+
+.nav-item-inactive:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+.nav-icon {
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+/* User footer */
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border, rgba(161,173,173,0.2));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-footer-collapsed {
+  justify-content: center;
+  padding: 12px 8px;
+}
+
+.sidebar-footer-expanded {
+  justify-content: flex-start;
+}
+
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(16,212,81,0.3), rgba(11,168,67,0.2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(16,212,81,0.3);
+}
+
+.user-avatar i {
+  font-size: 15px;
+  color: #10D451;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #1E2A3A);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-role {
+  font-size: 10px;
+  color: var(--text-muted, #6B7A8A);
+  text-transform: capitalize;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #6B7A8A);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.logout-icon {
+  font-size: 16px;
+}

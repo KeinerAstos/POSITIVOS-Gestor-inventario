@@ -8,6 +8,7 @@ import InventarioView from './components/InventarioView.jsx';
 import AsignacionView from './components/AsignacionView.jsx';
 import TecnicoView  from './components/TecnicoView.jsx';
 import FormularioActaQA from './components/FormularioActaQA.jsx';
+import SalidaView from './components/SalidaView.jsx';  // <-- NUEVA IMPORTACIÓN
 
 import {
   DevolucionView,
@@ -29,6 +30,7 @@ function Topbar({ view, user, collapsed }) {
     movimientos: 'Movimientos', reasignaciones: 'Historial Reasignaciones',
     bodegas: 'Bodegas', ot: 'Órdenes de Trabajo', 'carga-masiva': 'Carga Masiva',
     'control-calidad': 'Control de Calidad QA', 'tecnico': 'Vista Técnico',
+    salidas: 'Salidas',  // <-- NUEVA ENTRADA
   };
   return (
     <div style={{
@@ -145,6 +147,7 @@ export default function App() {
       case 'carga-masiva':    return <CargaMasivaView {...{ bodegas, materiales, refresh: loadAll }} />;
       case 'control-calidad': return <ControlCalidadView token={token} />;
       case 'tecnico':         return <TecnicoView {...{ user, token, refresh: loadAll }} />;
+      case 'salidas':         return <SalidaView user={user} refresh={loadAll} />;  // <-- NUEVO CASE
       default:                return <DashboardView {...{ bodegas, inv, mov }} />;
     }
   };

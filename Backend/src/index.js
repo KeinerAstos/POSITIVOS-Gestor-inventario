@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { verifyToken } = require('./middleware/auth');
 
 const app = express();
 
@@ -11,6 +12,9 @@ const actasQaRoutes = require('./routes/actas-qa');
 // middlewares
 app.use(cors());
 app.use(express.json());
+
+const salidasRouter = require('./routes/salidas');
+app.use('/api/salidas', verifyToken, salidasRouter);
 
 // ── Rutas ────────────────────────────────────────────
 app.use('/api/bodegas', require('./routes/bodegas'));
