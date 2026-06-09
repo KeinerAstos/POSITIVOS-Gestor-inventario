@@ -3,7 +3,7 @@ import { http, fmtFecha, ESTADO_META } from '../api.js';
 import { Card, CardHeader, Btn, Alert, Badge, Label, PageHeader, SearchInput, EmptyState, Loading, DropdownList } from './UI.jsx';
 import '../styles/InventarioView.css';
 
-export default function InventarioView({ bodegas = [], inv = [], materiales = [], ots = [], refresh, setView, setTransferItem }) {
+export default function InventarioView({ bodegas = [], inv = [], materiales = [], ots = [], refresh }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [alert, setAlert] = useState(null);
@@ -13,6 +13,12 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
 
   // Estados para exportación por estado
   const [reporteEstado, setReporteEstado] = useState('');
+
+  // Modal de movimientos
+  const [showMovementsModal, setShowMovementsModal] = useState(false);
+  const [selectedItemMovements, setSelectedItemMovements] = useState([]);
+  const [loadingMovements, setLoadingMovements] = useState(false);
+  const [currentItem, setCurrentItem] = useState(null);
 
   // OT search y creación
   const [buscarOT, setBuscarOT] = useState('');
@@ -130,6 +136,27 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
     URL.revokeObjectURL(link.href);
   };
   // ---------------------------------
+
+  // Función para cargar movimientos de un inventario_id
+  const loadMovements = async (inventarioId) => {
+    setLoadingMovements(true);
+    try {
+      // Suponiendo que el endpoint /movimientos acepta filtro por inventario_id
+      const response = await http.get(`/movimientos?inventario_id=${inventarioId}&limit=50`);
+      setSelectedItemMovements(response.data || []);
+    } catch (err) {
+      console.error(err);
+      setAlert({ type: 'error', msg: 'No se pudieron cargar los movimientos' });
+    } finally {
+      setLoadingMovements(false);
+    }
+  };
+
+  const handleShowMovements = (item) => {
+    setCurrentItem(item);
+    loadMovements(item.id);
+    setShowMovementsModal(true);
+  };
 
   // Lógica de creación de equipo (con manejo de nueva OT)
   const handleCreate = async () => {
@@ -367,8 +394,8 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
                       <td><span className="inventario-codigo">{item.material_id}</span></td>
                       <td>{item.descripcion || item.material_descripcion || '—'}</td>
                       <td>
-                        {item.serial 
-                          ? <code className="inventario-serial">{item.serial}</code> 
+                        {item.serial
+                          ? <code className="inventario-serial">{item.serial}</code>
                           : <span className="inventario-sin-serial">—</span>
                         }
                       </td>
@@ -379,7 +406,9 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
                       <td>{item.ubicacion || '—'}</td>
                       <td><Badge v={item.estado} /></td>
                       <td>
-                        <Btn variant="secondary" size="sm" onClick={() => { setTransferItem?.(item); setView?.('transferir'); }} icon="ti-arrows-transfer">Transferir</Btn>
+                        <Btn variant="secondary" size="sm" onClick={() => handleShowMovements(item)} icon="ti-history">
+                          Historial
+                        </Btn>
                       </td>
                     </tr>
                   ))}
@@ -389,6 +418,61 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
           )
         }
       </Card>
+
+      {/* Modal de movimientos */}
+      {/* Modal de movimientos */}
+      {showMovementsModal && currentItem && (
+        <div className="inventario-modal-overlay" onClick={() => setShowMovementsModal(false)}>
+          <div className="inventario-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="inventario-modal-header">
+              <h3>
+                Movimientos de {currentItem.descripcion || currentItem.material_id}
+                {currentItem.serial && ` - Serial: ${currentItem.serial}`}
+              </h3>
+              <button className="inventario-modal-close" onClick={() => setShowMovementsModal(false)}>×</button>
+            </div>
+            <div className="inventario-modal-body">
+              {loadingMovements ? (
+                <Loading text="Cargando movimientos..." />
+              ) : selectedItemMovements.length === 0 ? (
+                <EmptyState icon="ti-history-off" title="Sin movimientos" subtitle="Este equipo no tiene movimientos registrados" />
+              ) : (
+                <div className="inventario-modal-table-container">
+                  <table className="inventario-modal-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Estado Anterior</th>
+                        <th>Estado Nuevo</th>
+                        <th>OT</th>
+                        <th>Responsable</th>
+                        <th>Observación</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedItemMovements.map(m => (
+                        <tr key={m.id}>
+                          <td>{fmtFecha(m.created_at)}</td>
+                          <td>{m.tipo_movimiento}</td>
+                          <td>{m.estado_anterior || '—'}</td>
+                          <td>{m.estado_nuevo || '—'}</td>
+                          <td>{m.ot_anterior_numero || m.ot_nueva_numero || '—'}</td>
+                          <td>{m.usuario || m.tecnico_nombre || '—'}</td>
+                          <td>{m.observacion || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="inventario-modal-footer">
+              <Btn onClick={() => setShowMovementsModal(false)}>Cerrar</Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

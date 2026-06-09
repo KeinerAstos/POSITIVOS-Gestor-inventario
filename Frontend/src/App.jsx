@@ -188,17 +188,11 @@ export default function App() {
   };
 
   const handleSetView = (v) => {
-<<<<<<< HEAD
-    const rol = String(user?.rol || user?.tipo || '').toLowerCase().trim();
-    if (rol === 'tecnico' && v !== 'tecnico') return;
-    setView(v);
-=======
       const rol = String(user?.rol || user?.tipo || '').toLowerCase().trim();
       if (rol === 'tecnico'         && v !== 'tecnico')         return;
       if (rol === 'control_calidad' && v !== 'control-calidad') return;
       if (rol === 'preconfigurador' && v !== 'ot-dashboard')    return;
       setView(v);
->>>>>>> 0fd93b10071f5d8a83dbbac957d7890f976c4fbd
   };
 
   return (

@@ -175,7 +175,7 @@ export default function MovimientosView() {
                         <td className="movimientos-cantidad">{m.cantidad || 1}</td>
                         <td className="movimientos-estado-anterior">{m.estado_anterior || '—'}</td>
                         <td className="movimientos-estado-nuevo">{m.estado_nuevo || '—'}</td>
-                        <td>{m.ot_anterior_numero || (m.ot_anterior ? `OT #${m.ot_anterior}` : '—')}</td>
+                        <td>{m.ot_nueva_numero || (m.ot_nueva ? `OT #${m.ot_nueva}` : '—')}</td> 
                         <td>{m.usuario || m.tecnico_nombre || '—'}</td>
                         <td className="movimientos-fecha">{fmtFecha(m.created_at)}</td>
                       </tr>

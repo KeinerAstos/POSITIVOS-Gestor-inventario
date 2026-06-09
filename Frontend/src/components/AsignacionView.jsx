@@ -258,11 +258,7 @@ export default function AsignacionView({ inv = [], ots = [], tecnicos = [], refr
 
         {/* Card 3: materiales consumibles */}
         <Card>
-          <CardHeader
-            title="Materiales consumibles"
-            icon="ti-package"
-            subtitle={`${materiales.filter(m => m.inventario_id).length} seleccionados`}
-          />
+          <CardHeader title="Materiales consumibles" icon="ti-package" subtitle={`${materiales.filter(m => m.inventario_id).length} seleccionados`} />
           <div className="asignacion-card-body">
             <div className="asignacion-list" style={{ maxHeight: 200 }}>
               {materiales.map((mat, idx) => (
@@ -282,7 +278,8 @@ export default function AsignacionView({ inv = [], ots = [], tecnicos = [], refr
                     <option value="">Seleccionar material...</option>
                     {poolMateriales.map(m => (
                       <option key={m.id} value={m.id}>
-                        {m.descripcion || m.material_id} (Stock: {m.cantidad})
+                        {(m.material_descripcion || m.descripcion)}
+                        {m.material_id && ` (${m.material_id})`} - Stock: {m.cantidad}
                       </option>
                     ))}
                   </select>
@@ -299,30 +296,21 @@ export default function AsignacionView({ inv = [], ots = [], tecnicos = [], refr
                     }}
                     disabled={!mat.inventario_id}
                   />
-                  <button
-                    className="asignacion-remove-btn"
-                    onClick={() => {
-                      if (materiales.length === 1) {
-                        setMateriales([{ inventario_id: '', cantidad: 1, disponible: 0 }]);
-                      } else {
-                        setMateriales(materiales.filter((_, i) => i !== idx));
-                      }
-                    }}
-                  >
-                    ×
-                  </button>
+                  <button className="asignacion-remove-btn" onClick={() => {
+                    if (materiales.length === 1) {
+                      setMateriales([{ inventario_id: '', cantidad: 1, disponible: 0 }]);
+                    } else {
+                      setMateriales(materiales.filter((_, i) => i !== idx));
+                    }
+                  }}>×</button>
                 </div>
               ))}
             </div>
-            <button
-              className="asignacion-add-btn"
-              onClick={() => setMateriales(p => [...p, { inventario_id: '', cantidad: 1, disponible: 0 }])}
-              disabled={!poolMateriales.length}
-            >
+            <button className="asignacion-add-btn" onClick={() => setMateriales(p => [...p, { inventario_id: '', cantidad: 1, disponible: 0 }])} disabled={!poolMateriales.length}>
               + Agregar material
             </button>
 
-            {/* Resumen */}
+            {/* Resumen (sin cambios) */}
             <div className="asignacion-summary">
               <span className="asignacion-summary-item">
                 🔧 Equipos: <strong className="asignacion-summary-value">{equipos.filter(e => e.id).length}</strong>
@@ -342,12 +330,7 @@ export default function AsignacionView({ inv = [], ots = [], tecnicos = [], refr
               )}
             </div>
 
-            <Btn
-              onClick={handleSubmit}
-              loading={saving}
-              icon="ti-send"
-              className="asignacion-submit-btn"
-            >
+            <Btn onClick={handleSubmit} loading={saving} icon="ti-send" className="asignacion-submit-btn">
               Entregar al Técnico
             </Btn>
           </div>
