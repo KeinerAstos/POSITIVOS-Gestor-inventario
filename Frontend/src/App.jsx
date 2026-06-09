@@ -113,7 +113,7 @@ export default function App() {
     localStorage.setItem('user', JSON.stringify(u));
     window.CURRENT_USER_ID = u?.id;
     // Redirigir según rol
-    if (u?.rol === 'tecnico') setView('tecnico');
+    if (u?.tipo === 'tecnico') setView('tecnico');
     else setView('dashboard');
   };
 
@@ -151,7 +151,7 @@ export default function App() {
 
   /* ── nav guard: técnico solo ve su vista ── */
   const handleSetView = (v) => {
-    if (user?.rol === 'tecnico' && v !== 'tecnico') return;
+    if (user?.tipo === 'tecnico' && v !== 'tecnico') return;
     setView(v);
   };
 

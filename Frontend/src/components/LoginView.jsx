@@ -3,13 +3,13 @@ import { http } from '../api.js';
 import { Alert, Btn } from './UI.jsx';
 
 export default function LoginView({ onLogin }) {
-  const [form, setForm] = useState({ usuario: '', password: '' });
+  const [form, setForm] = useState({ cedula: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    if (!form.usuario || !form.password) { setError('Completa todos los campos'); return; }
+    if (!form.cedula || !form.password) { setError('Completa todos los campos'); return; }
     setLoading(true); setError('');
     try {
       const data = await http.post('/auth/login', form);
@@ -72,9 +72,9 @@ export default function LoginView({ onLogin }) {
             <div style={{ position: 'relative' }}>
               <i className="ti ti-user" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 15, pointerEvents: 'none' }} />
               <input
-                value={form.usuario}
-                onChange={e => setForm(p => ({ ...p, usuario: e.target.value }))}
-                placeholder="Tu nombre de usuario"
+                value={form.cedula}
+                onChange={e => setForm(p => ({ ...p, cedula: e.target.value }))}
+                placeholder="Tu nombre de usuario o cedula"
                 style={{ paddingLeft: 34 }}
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               />

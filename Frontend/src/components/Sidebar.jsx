@@ -175,7 +175,7 @@ export default function Sidebar({ view, setView, user, onLogout, collapsed, setC
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user?.nombre || 'Usuario'}
               </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user?.rol || 'admin'}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'capitalize' }}>{user?.tipo || 'admin'}</div>
             </div>
             <button onClick={onLogout} title="Cerrar sesión" style={{
               background: 'none', border: 'none', cursor: 'pointer',
