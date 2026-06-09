@@ -13,7 +13,11 @@ app.use(cors());
 app.use(express.json());
 
 const salidasRouter = require('./routes/salidas');
+api/src/index.js
 app.use('/api/salidas', verifyToken, salidasRouter); // ✅ ahora verifyToken existe
+
+app.use('/api/salidas', verifyToken, salidasRouter);
+Backend/src/index.js
 
 // ── Rutas ────────────────────────────────────────────
 app.use('/api/bodegas', require('./routes/bodegas'));

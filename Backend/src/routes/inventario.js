@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
@@ -588,111 +587,152 @@ router.post('/devolver-bodega', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Obtener el elemento (equipo o material)
+    // Obtener el elemento (equipo o material) con bloqueo
     const { rows } = await client.query(
-      `SELECT id, estado, ot_id, bodega_id, material_id, serial, cantidad
-             FROM inventario 
-             WHERE id = $1 
-             FOR UPDATE`,
+      `SELECT id, estado, ot_id, bodega_id, material_id, serial, cantidad,
+              documento_material, oth, lote, ubicacion
+       FROM inventario 
+       WHERE id = $1 
+       FOR UPDATE`,
       [inventario_id]
     );
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Elemento no encontrado' });
     }
     const item = rows[0];
+
+    // Validación: solo elementos en TERRENO
     if (item.estado !== 'TERRENO') {
       return res.status(400).json({ error: 'Solo elementos en TERRENO pueden devolverse' });
     }
 
+    // Determinar cantidad a devolver
     let cantidadADevolver = (cantidad_devolver !== undefined) ? cantidad_devolver : item.cantidad;
     if (cantidadADevolver <= 0 || cantidadADevolver > item.cantidad) {
       return res.status(400).json({ error: 'Cantidad a devolver inválida' });
     }
 
-    const esSerializable = item.serial !== null;
+    const esSerializable = (item.serial !== null && item.serial !== '');
+    const estadoNuevo = conservar_ot ? 'INGRESADO' : 'STOCK';
+    const esDevolucionTotal = (cantidadADevolver === item.cantidad);
 
     if (esSerializable) {
-      // Equipo serializado: debe devolverse entero (cantidad=1)
+      // ========== EQUIPO SERIALIZADO ==========
       if (cantidadADevolver !== 1) {
         return res.status(400).json({ error: 'Para equipos serializados la cantidad a devolver debe ser 1' });
       }
-      const estadoFinal = conservar_ot ? 'INGRESADO' : 'STOCK';
+
+      // Actualizar el mismo registro
       await client.query(
         `UPDATE inventario 
-                 SET estado = $1,
-                     usuario_asignado = NULL,
-                     ot_id = $2
-                 WHERE id = $3`,
-        [estadoFinal, conservar_ot ? item.ot_id : null, inventario_id]
+         SET estado = $1,
+             usuario_asignado = NULL,
+             ot_id = $2,
+             updated_at = NOW()
+         WHERE id = $3`,
+        [estadoNuevo, conservar_ot ? item.ot_id : null, inventario_id]
       );
+
+      // Registrar movimiento
       await client.query(
         `INSERT INTO movimientos (
-                    tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
-                    estado_nuevo, bodega_destino_id, observacion, created_at
-                ) VALUES (
-                    'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', $3, $4, $5, NOW()
-                )`,
-        [inventario_id, item.ot_id, estadoFinal, item.bodega_id, observacion || 'Devolución a bodega']
+          tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+          estado_nuevo, bodega_destino_id, observacion, created_at
+        ) VALUES (
+          'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', $3, $4, $5, NOW()
+        )`,
+        [inventario_id, item.ot_id, estadoNuevo, item.bodega_id, observacion || 'Devolución de equipo a bodega']
       );
-    } else {
-      // Material no serializado: reintegrar al stock original
-      // Buscar registro de stock existente (mismo material, bodega, sin serial, misma OT si conservar_ot)
-      let stockQuery = `
-                SELECT id, cantidad
-                FROM inventario 
-                WHERE material_id = $1 
-                  AND bodega_id = $2 
-                  AND serial IS NULL
-            `;
-      const params = [item.material_id, item.bodega_id];
-      if (conservar_ot) {
-        stockQuery += ` AND ot_id = $3`;
-        params.push(item.ot_id);
-      } else {
-        stockQuery += ` AND (ot_id IS NULL OR ot_id = 0)`;
-      }
-      const { rows: stockRows } = await client.query(stockQuery, params);
-      let stockId;
-      if (stockRows.length > 0) {
-        stockId = stockRows[0].id;
-        await client.query(
-          `UPDATE inventario SET cantidad = cantidad + $1 WHERE id = $2`,
-          [cantidadADevolver, stockId]
-        );
-      } else {
-        const estadoStock = conservar_ot ? 'INGRESADO' : 'STOCK';
-        const insertRes = await client.query(
-          `INSERT INTO inventario (material_id, cantidad, ot_id, estado, bodega_id, created_at)
-                     VALUES ($1, $2, $3, $4, $5, NOW())
-                     RETURNING id`,
-          [item.material_id, cantidadADevolver, conservar_ot ? item.ot_id : null, estadoStock, item.bodega_id]
-        );
-        stockId = insertRes.rows[0].id;
-      }
 
-      // Reducir o eliminar el registro en TERRENO
-      if (cantidadADevolver === item.cantidad) {
-        await client.query(`DELETE FROM inventario WHERE id = $1`, [inventario_id]);
+    } else {
+      // ========== MATERIAL NO SERIALIZADO ==========
+      if (esDevolucionTotal) {
+        // ✅ Devolución total: solo cambiar estado (y opcionalmente liberar OT)
+        await client.query(
+          `UPDATE inventario
+           SET estado = $1,
+               ot_id = $2,
+               usuario_asignado = NULL,
+               updated_at = NOW()
+           WHERE id = $3`,
+          [estadoNuevo, conservar_ot ? item.ot_id : null, inventario_id]
+        );
+
+        await client.query(
+          `INSERT INTO movimientos (
+            tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+            estado_nuevo, bodega_destino_id, observacion, created_at
+          ) VALUES (
+            'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', $3, $4, $5, NOW()
+          )`,
+          [inventario_id, item.ot_id, estadoNuevo, item.bodega_id, observacion || 'Devolución total de material a bodega']
+        );
+
       } else {
+        // ✅ Devolución parcial: restar del original y acumular en stock (o crear nuevo registro)
+        
+        // Buscar registro de stock compatible (mismo material, bodega, sin serial, misma OT si conservar_ot)
+        let stockQuery = `
+          SELECT id, cantidad
+          FROM inventario
+          WHERE material_id = $1
+            AND bodega_id = $2
+            AND (serial IS NULL OR serial = '')
+        `;
+        const params = [item.material_id, item.bodega_id];
+        if (conservar_ot) {
+          stockQuery += ` AND ot_id = $3`;
+          params.push(item.ot_id);
+        } else {
+          stockQuery += ` AND (ot_id IS NULL OR ot_id = 0)`;
+        }
+
+        const { rows: stockRows } = await client.query(stockQuery, params);
+
+        if (stockRows.length > 0) {
+          // Actualizar stock existente
+          const stockId = stockRows[0].id;
+          await client.query(
+            `UPDATE inventario SET cantidad = cantidad + $1 WHERE id = $2`,
+            [cantidadADevolver, stockId]
+          );
+        } else {
+          // Crear nuevo registro de stock copiando metadatos del original
+          await client.query(
+            `INSERT INTO inventario (
+              material_id, cantidad, ot_id, estado, bodega_id,
+              documento_material, oth, lote, ubicacion, created_at
+            )
+            SELECT
+              material_id, $1, $2, $3, $4,
+              documento_material, oth, lote, ubicacion, NOW()
+            FROM inventario WHERE id = $5`,
+            [cantidadADevolver, conservar_ot ? item.ot_id : null, estadoNuevo, item.bodega_id, inventario_id]
+          );
+        }
+
+        // Reducir la cantidad del registro original (que sigue en TERRENO)
         await client.query(
           `UPDATE inventario SET cantidad = cantidad - $1 WHERE id = $2`,
           [cantidadADevolver, inventario_id]
         );
-      }
 
-      await client.query(
-        `INSERT INTO movimientos (
-                    tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
-                    estado_nuevo, bodega_destino_id, observacion, created_at
-                ) VALUES (
-                    'DEVOLUCION_MATERIAL', $1, $2, 'TERRENO', 'STOCK', $3, $4, NOW()
-                )`,
-        [inventario_id, item.ot_id, item.bodega_id, observacion || 'Devolución de material a bodega']
-      );
+        // Registrar movimiento parcial (estado_nuevo = 'TERRENO' porque el registro original sigue en terreno)
+        await client.query(
+          `INSERT INTO movimientos (
+            tipo_movimiento, inventario_id, ot_anterior, estado_anterior,
+            estado_nuevo, bodega_destino_id, observacion, created_at
+          ) VALUES (
+            'DEVOLUCION_BODEGA', $1, $2, 'TERRENO', 'TERRENO', $3, $4, NOW()
+          )`,
+          [inventario_id, item.ot_id, item.bodega_id, observacion || `Devolución parcial de ${cantidadADevolver} unidades a bodega`]
+        );
+      }
     }
 
     await client.query('COMMIT');
     res.json({ success: true, message: 'Devolución procesada correctamente' });
+
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error en devolución:', err);
