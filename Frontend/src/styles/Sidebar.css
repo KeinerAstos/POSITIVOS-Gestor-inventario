@@ -244,6 +244,72 @@
   align-items: center;
 }
 
-.logout-icon {
+.logo-white-box {
+  background: #ffffff;
+  border-radius: 15px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-image {
+  height: 28px;
+  width: auto;
+}
+
+/* Logo content ocupa todo el espacio disponible */
+.sidebar-logo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;  /* Ocupa todo el espacio restante */
+}
+
+.logo-white-box {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 6px 8px;   /* Ajusta el padding para que sea más ancho */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 44px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.logo-white-box.collapsed {
+  margin: 0 auto;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+}
+
+.logo-image {
+  width: auto;
+  height: 28px;  /* Ajusta la altura de la imagen para que se vea bien */
+  object-fit: contain;
+}
+
+.logo-text-wrapper {
+  flex: 1;
+  text-align: left;
+}
+
+/* Opcional: si quieres que el texto ocupe más espacio */
+.logo-text {
   font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.logo-sub {
+  font-size: 10px;
+  white-space: nowrap;
 }

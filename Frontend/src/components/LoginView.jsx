@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { http } from '../api.js';
 import { Alert, Btn } from './UI.jsx';
 import '../styles/LoginView.css';
+import logoPositivo from '../assets/logo.png';
+import logoClaro from '../assets/Claro-logo.png';
 
 export default function LoginView({ onLogin }) {
   const [form, setForm] = useState({ cedula: '', password: '' });
@@ -36,14 +38,27 @@ export default function LoginView({ onLogin }) {
 
   return (
     <div className="login-container">
-      <div className="login-grid-bg" />
+      {/* Degradado de fondo y patrón */}
+      <div className="login-bg-gradient"></div>
+      <div className="login-pattern"></div>
+
       <div className="login-card-wrapper fade-in">
-        <div className="login-logo">
-          <div className="logo-circle">
-            <i className="ti ti-plus" />
+        {/* Logos corporativos */}
+        <div className="login-logos">
+          <div className="logo-item">
+            <img src={logoPositivo} alt="Positivo S+" className="logo-img" />
+
           </div>
-          <h1 className="login-title">POSITIVO S+</h1>
-          <p className="login-subtitle">Tecnología que transforma</p>
+          <div className="logo-separator">+</div>
+          <div className="logo-item">
+            <img src={logoClaro} alt="Claro" className="logo-img" />
+          </div>
+        </div>
+
+        <div className="login-logo">
+          <h1 className="login-title">sTr</h1>
+          <p className="login-subtitle">Sistema de Inventario Inteligente</p>
+          <p className="login-tagline">Tecnología que transforma</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form-card">
@@ -59,6 +74,7 @@ export default function LoginView({ onLogin }) {
                 value={form.cedula}
                 onChange={(e) => setForm({ ...form, cedula: e.target.value })}
                 placeholder="Número de identificación"
+                autoComplete="off"
               />
             </div>
           </div>
@@ -85,7 +101,10 @@ export default function LoginView({ onLogin }) {
           </div>
         </form>
 
-        <p className="login-footer">Sistema de gestión de inventario · v2.0</p>
+        <p className="login-footer">
+          Sistema de gestión de inventario · v2.0<br />
+          <span className="footer-empresas">Positivo S+ · Claro · sTr</span>
+        </p>
       </div>
     </div>
   );

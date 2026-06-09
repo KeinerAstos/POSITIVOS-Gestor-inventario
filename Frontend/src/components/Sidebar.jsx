@@ -1,5 +1,6 @@
 import React from 'react';
 import '../styles/Sidebar.css';
+import logoEmpresa from '../assets/logo.png';
 
 const normalizarRol = (valor = '') => {
   return String(valor)
@@ -132,11 +133,11 @@ export default function Sidebar({ view, setView, user, onLogout, collapsed, setC
       <div className={`sidebar-logo ${collapsed ? 'sidebar-logo-collapsed' : ''}`}>
         {!collapsed ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div className="logo-icon">
-                <i className="ti ti-building-warehouse" />
+            <div className="logo-content">
+              <div className="logo-white-box">
+                <img src={logoEmpresa} alt="Logo" className="logo-image" />
               </div>
-              <div>
+              <div className="logo-text-wrapper">
                 <div className="logo-text">Positivo S+</div>
                 <div className="logo-sub">Inventario</div>
               </div>
@@ -147,8 +148,8 @@ export default function Sidebar({ view, setView, user, onLogout, collapsed, setC
           </>
         ) : (
           <>
-            <div className="logo-icon">
-              <i className="ti ti-building-warehouse" />
+            <div className="logo-white-box collapsed">
+              <img src={logoEmpresa} alt="Logo" className="logo-image" />
             </div>
             <button onClick={() => setCollapsed(false)} className="expand-btn">
               <i className="ti ti-layout-sidebar-right-collapse expand-btn-icon" />
