@@ -1,0 +1,140 @@
+/* ============================================
+   DASHBOARD VIEW - ESTILOS ESPECÍFICOS
+   ============================================ */
+
+/* Grid de estadísticas */
+.dashboard-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+/* Grid principal (2 columnas) */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+}
+
+/* Contenedor de bodegas */
+.dashboard-bodega-list {
+  padding: 16px;
+}
+
+/* Item de bodega */
+.dashboard-bodega-item {
+  margin-bottom: 14px;
+}
+
+/* Header de bodega (nombre + total) */
+.dashboard-bodega-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.dashboard-bodega-name {
+  font-size: 13px;
+  color: var(--text-primary, #1e293b);
+  font-weight: 500;
+}
+
+.dashboard-bodega-total {
+  font-size: 12px;
+  color: var(--amber-glow, #f59e0b);
+  font-weight: 600;
+}
+
+/* Barra de progreso de bodega */
+.dashboard-progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.dashboard-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Disponible de bodega */
+.dashboard-bodega-stock {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  margin-top: 3px;
+}
+
+/* Badge de tipo de movimiento */
+.dashboard-movimiento-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Serial en movimientos */
+.dashboard-serial {
+  font-size: 10px;
+  color: var(--text-muted, #64748b);
+  font-family: var(--font-mono, monospace);
+}
+
+/* Transición de estado */
+.dashboard-estado-transition {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.dashboard-estado-anterior {
+  color: #f97316;
+}
+
+.dashboard-estado-nuevo {
+  color: #22c55e;
+}
+
+.dashboard-arrow-icon {
+  font-size: 10px;
+  color: var(--text-muted, #64748b);
+}
+
+/* Fecha en movimientos */
+.dashboard-fecha {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .dashboard-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+/* Animación para cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-fade-in {
+  animation: fadeInUp 0.3s ease-out;
+}

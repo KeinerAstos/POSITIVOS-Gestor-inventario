@@ -1,28 +1,29 @@
 import React, { useState, useMemo } from 'react';
 import { http, fmtFecha, ESTADO_META } from '../api.js';
 import { Card, CardHeader, Btn, Alert, Badge, Label, PageHeader, SearchInput, EmptyState, Loading, DropdownList } from './UI.jsx';
+import '../styles/InventarioView.css';
 
 export default function InventarioView({ bodegas = [], inv = [], materiales = [], ots = [], refresh, setView, setTransferItem }) {
-  const [showForm, setShowForm]   = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [alert, setAlert]         = useState(null);
-  const [filterBodega, setFB]     = useState('');
-  const [filterEstado, setFE]     = useState('');
-  const [search, setSearch]       = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [alert, setAlert] = useState(null);
+  const [filterBodega, setFB] = useState('');
+  const [filterEstado, setFE] = useState('');
+  const [search, setSearch] = useState('');
 
   // Estados para exportación por estado
   const [reporteEstado, setReporteEstado] = useState('');
 
   // OT search y creación
-  const [buscarOT, setBuscarOT]   = useState('');
+  const [buscarOT, setBuscarOT] = useState('');
   const [showOtDrop, setShowOtDrop] = useState(false);
-  const [otSel, setOtSel]         = useState(null);
+  const [otSel, setOtSel] = useState(null);
   const [nuevaOTData, setNuevaOTData] = useState({ cliente: '', destino: '', mostrarFormulario: false });
 
   // Material search
   const [buscarMat, setBuscarMat] = useState('');
   const [showMatDrop, setShowMatDrop] = useState(false);
-  const [matSel, setMatSel]       = useState(null);
+  const [matSel, setMatSel] = useState(null);
 
   const [form, setForm] = useState({
     material_id: '', serial: '', cantidad: 1, bodega_id: '',
@@ -235,8 +236,8 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
         icon="ti-package"
         subtitle={`${filtered.length} de ${inv.length} equipos · ${totalConSerial} con serial · ${totalSinSerial} sin serial`}
         actions={
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <select value={reporteEstado} onChange={e => setReporteEstado(e.target.value)} style={{ width: 160 }}>
+          <div className="inventario-actions">
+            <select className="inventario-export-select" value={reporteEstado} onChange={e => setReporteEstado(e.target.value)}>
               <option value="">Todos los estados</option>
               {Object.keys(ESTADO_META).map(k => <option key={k} value={k}>{ESTADO_META[k].label}</option>)}
             </select>
@@ -253,23 +254,23 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
 
       {/* Formulario de creación */}
       {showForm && (
-        <Card style={{ marginBottom: 20 }} className="fade-in">
+        <Card className="inventario-form fade-in">
           <CardHeader title="Registrar nuevo equipo" icon="ti-plus" />
-          <div style={{ padding: 20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 14 }}>
+          <div className="inventario-form-body" style={{ padding: 20 }}>
+            <div className="inventario-form-grid">
               {/* Material autocompletado */}
-              <div style={{ position: 'relative' }}>
+              <div className="inventario-field-relative">
                 <Label required>Material (SAP)</Label>
-                <div style={{ position: 'relative' }}>
+                <div className="inventario-input-wrapper">
                   <input
                     value={buscarMat}
                     onChange={e => { setBuscarMat(e.target.value); setShowMatDrop(true); setMatSel(null); setForm(p => ({ ...p, material_id: '' })); }}
                     placeholder="Código o descripción..."
                     onFocus={() => setShowMatDrop(true)}
                   />
-                  {buscarMat && <button onClick={clearMaterial} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>×</button>}
+                  {buscarMat && <button className="inventario-clear-btn" onClick={clearMaterial}>×</button>}
                 </div>
-                {matSel && <div style={{ fontSize: 11, color: 'var(--primary)', marginTop: 3 }}>✓ {matSel.codigo_sap} — {matSel.descripcion}</div>}
+                {matSel && <div className="inventario-selected-badge">✓ {matSel.codigo_sap} — {matSel.descripcion}</div>}
                 <DropdownList
                   items={showMatDrop ? filteredMats : []}
                   onSelect={selectMaterial}
@@ -282,9 +283,9 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
               <div><Label required>Bodega destino</Label><select value={form.bodega_id} onChange={f('bodega_id')}><option value="">Seleccionar...</option>{bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}</select></div>
 
               {/* OT con autocompletado y creación */}
-              <div style={{ position: 'relative' }}>
+              <div className="inventario-field-relative">
                 <Label>OT (Opcional)</Label>
-                <div style={{ position: 'relative' }}>
+                <div className="inventario-input-wrapper">
                   <input
                     value={buscarOT}
                     onChange={e => {
@@ -298,9 +299,9 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
                     placeholder="Número de OT..."
                     onFocus={() => setShowOtDrop(true)}
                   />
-                  {buscarOT && <button onClick={clearOT} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>×</button>}
+                  {buscarOT && <button className="inventario-clear-btn" onClick={clearOT}>×</button>}
                 </div>
-                {otSel && <div style={{ fontSize: 11, color: 'var(--primary)', marginTop: 3 }}>✓ {otSel.numero_ot} — {otSel.cliente}</div>}
+                {otSel && <div className="inventario-selected-badge">✓ {otSel.numero_ot} — {otSel.cliente}</div>}
                 <DropdownList items={showOtDrop ? filteredOTs : []} onSelect={selectOT} renderItem={o => <><strong>{o.numero_ot}</strong><div style={{ fontSize: 11 }}>{o.cliente}</div></>} />
               </div>
 
@@ -311,17 +312,17 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
             </div>
 
             {nuevaOTData.mostrarFormulario && (
-              <div style={{ background: 'rgba(16,212,81,0.08)', border: '1px solid rgba(16,212,81,0.2)', borderRadius: 10, padding: 14, marginBottom: 14 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', marginBottom: 10 }}>✨ Nueva OT — completar datos</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="inventario-nueva-ot">
+                <div className="inventario-nueva-ot-title">✨ Nueva OT — completar datos</div>
+                <div className="inventario-nueva-ot-grid">
                   <div><Label required>Cliente</Label><input value={nuevaOTData.cliente} onChange={e => setNuevaOTData(p => ({ ...p, cliente: e.target.value }))} placeholder="Nombre cliente" /></div>
                   <div><Label>Destino</Label><input value={nuevaOTData.destino} onChange={e => setNuevaOTData(p => ({ ...p, destino: e.target.value }))} placeholder="Dirección" /></div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}><i className="ti ti-info-circle" /> Esta OT se creará automáticamente al guardar.</div>
+                <div className="inventario-nueva-ot-info"><i className="ti ti-info-circle" /> Esta OT se creará automáticamente al guardar.</div>
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div className="inventario-form-buttons">
               <Btn onClick={handleCreate} loading={saving} icon="ti-check">Registrar equipo</Btn>
               <Btn variant="secondary" onClick={() => { setShowForm(false); resetForm(); }}>Cancelar</Btn>
             </div>
@@ -331,13 +332,13 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
 
       {/* Filtros */}
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ padding: '12px 16px', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <SearchInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por cualquier campo (material, serie, OT, lote, doc, OTH, ubicación, estado)..." style={{ flex: 2, minWidth: 250 }} />
-          <select value={filterBodega} onChange={e => setFB(e.target.value)} style={{ width: 180 }}>
+        <div className="inventario-filtros">
+          <SearchInput className="inventario-search-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por cualquier campo (material, serie, OT, lote, doc, OTH, ubicación, estado)..." />
+          <select className="inventario-bodega-select" value={filterBodega} onChange={e => setFB(e.target.value)}>
             <option value="">Todas las bodegas</option>
             {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
           </select>
-          <select value={filterEstado} onChange={e => setFE(e.target.value)} style={{ width: 160 }}>
+          <select className="inventario-estado-select" value={filterEstado} onChange={e => setFE(e.target.value)}>
             <option value="">Todos los estados</option>
             {Object.entries(ESTADO_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
@@ -352,8 +353,8 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
         {filtered.length === 0
           ? <EmptyState icon="ti-package-off" title="Sin equipos" subtitle="No hay equipos que coincidan con los filtros" />
           : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ minWidth: 1100 }}>
+            <div className="inventario-table-container">
+              <table className="inventario-table">
                 <thead>
                   <tr>
                     <th>Cantidad</th><th>Código</th><th>Descripción</th><th>Serie</th><th>Doc. Material</th><th>OT</th><th>OTH</th><th>Lote</th><th>Ubicación</th><th>Estado</th><th>Acción</th>
@@ -362,10 +363,15 @@ export default function InventarioView({ bodegas = [], inv = [], materiales = []
                 <tbody>
                   {filtered.map(item => (
                     <tr key={item.id}>
-                      <td style={{ textAlign: 'center' }}>{item.cantidad ?? 1}</td>
-                      <td><span className="mono">{item.material_id}</span></td>
+                      <td className="cantidad-cell">{item.cantidad ?? 1}</td>
+                      <td><span className="inventario-codigo">{item.material_id}</span></td>
                       <td>{item.descripcion || item.material_descripcion || '—'}</td>
-                      <td>{item.serial ? <code className="mono">{item.serial}</code> : <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>—</span>}</td>
+                      <td>
+                        {item.serial 
+                          ? <code className="inventario-serial">{item.serial}</code> 
+                          : <span className="inventario-sin-serial">—</span>
+                        }
+                      </td>
                       <td>{item.documento_material || '—'}</td>
                       <td>{item.numero_ot ? <Badge v="info" style={{ background: 'none' }}>{item.numero_ot}</Badge> : '—'}</td>
                       <td>{item.oth || '—'}</td>

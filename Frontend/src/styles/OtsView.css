@@ -1,0 +1,97 @@
+/* OtsView.css */
+.ots-fade-in {
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ots-form-card {
+  margin-bottom: 20px;
+}
+
+.ots-card-body {
+  padding: 20px;
+}
+
+.ots-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.ots-input, .ots-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+}
+
+.ots-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ots-search-card {
+  margin-bottom: 16px;
+}
+
+.ots-search-container {
+  padding: 10px 16px;
+}
+
+.ots-table-container {
+  overflow-x: auto;
+}
+
+.ots-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+.ots-table th {
+  text-align: left;
+  padding: 12px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.ots-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-light, #f1f5f9);
+  font-size: 13px;
+}
+
+.ots-ot-numero {
+  font-weight: 600;
+  color: var(--amber-glow, #f59e0b);
+  font-family: var(--font-mono, monospace);
+}
+
+.ots-cliente {
+  font-weight: 500;
+}
+
+.ots-destino {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+}
+
+.ots-estado-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ots-fecha {
+  color: var(--text-muted, #64748b);
+  font-size: 12px;
+}
