@@ -21,8 +21,10 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-export default function FormularioActaQA({ equiposAsignados = [], token, onSuccess, onCancel }) {
+export default function FormularioActaQA({ equiposAsignados = [], formatoQa, token, onSuccess, onCancel }) {
   const [form, setForm] = useState({
+    tipo_formato: formatoQa?.id || 'qa_mpls',
+    nombre_formato: formatoQa?.nombre || 'ACTA QA MPLS',
     fecha_ejecucion:      new Date().toISOString().split('T')[0],
     hora_inicio:          '',
     hora_salida:          '',
@@ -88,11 +90,16 @@ export default function FormularioActaQA({ equiposAsignados = [], token, onSucce
   const handleSubmit = async () => {
     if (!form.fecha_ejecucion || !form.hora_inicio) { setAlert({ type: 'error', msg: 'Fecha y hora de inicio son obligatorias.' }); return; }
     setLoading(true); setAlert(null);
+    const payload = {
+      ...form,
+      tipo_formato: formatoQa?.id || form.tipo_formato || 'qa_mpls',
+      nombre_formato: formatoQa?.nombre || form.nombre_formato || 'ACTA QA MPLS',
+    };
     try {
       const res = await fetch('/api/actas-qa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Error al guardar'); }
       const data = await res.json();
@@ -170,8 +177,12 @@ export default function FormularioActaQA({ equiposAsignados = [], token, onSucce
             <i className="ti ti-clipboard-check" style={{ fontSize: 22, color: 'var(--amber-glow)' }} />
           </div>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>Nueva Acta QA</h2>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Registro de instalación y calidad</p>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
+              {formatoQa?.nombre || 'Nueva Acta QA'}
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+              {formatoQa?.descripcion || 'Registro de instalación y calidad'}
+            </p>
           </div>
         </div>
         <Btn variant="secondary" onClick={onCancel} icon="ti-x">Cancelar</Btn>
