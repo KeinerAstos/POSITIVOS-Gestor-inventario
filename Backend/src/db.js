@@ -7,11 +7,13 @@ const pool = new Pool({
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  ssl: { rejectUnauthorized: false }   // <--- añadido para Neon
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 pool.on('error', (err) => {
   console.error('Error inesperado en el pool de PostgreSQL:', err);
 });
 
-module.exports = pool;   // <--- asegúrate de exportar solo el pool, no un objeto con pool dentro
+module.exports = pool;

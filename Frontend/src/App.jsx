@@ -2,29 +2,30 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { http } from './api.js';
 import { ThemeProvider } from './context/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
-
+import CambiarPasswordModal from './components/CambiarPasswordModal.jsx';
+ 
 // Importar CSS de temas
 import './styles/themes/dark.css';
 import './styles/themes/light.css';
-
-import LoginView from './components/LoginView.jsx';
-import Sidebar from './components/Sidebar.jsx';
-import DashboardView from './components/DashboardView.jsx';
-import InventarioView from './components/InventarioView.jsx';
-import AsignacionView from './components/AsignacionView.jsx';
-import TecnicoView from './components/TecnicoView.jsx';
-import FormularioActaQA from './components/FormularioActaQA.jsx';
-import SalidaView from './components/SalidaView.jsx';
-import DevolucionView from './components/DevolucionView.jsx';
+ 
+import LoginView          from './components/LoginView.jsx';
+import Sidebar            from './components/Sidebar.jsx';
+import DashboardView      from './components/DashboardView.jsx';
+import InventarioView     from './components/InventarioView.jsx';
+import AsignacionView     from './components/AsignacionView.jsx';
+import TecnicoView        from './components/TecnicoView.jsx';
+import FormularioActaQA   from './components/FormularioActaQA.jsx';
+import SalidaView         from './components/SalidaView.jsx';
+import DevolucionView     from './components/DevolucionView.jsx';
 import ReasignacionOTView from './components/ReasignacionOTView.jsx';
-import MovimientosView from './components/MovimientosView.jsx';
+import MovimientosView    from './components/MovimientosView.jsx';
 import ReasignacionesView from './components/ReasignacionesView.jsx';
-import BodegasView from './components/BodegasView.jsx';
-import OtsView from './components/OtsView.jsx';
-import OTDashboardView from './components/OTDashboardView.jsx';
+import BodegasView        from './components/BodegasView.jsx';
+import OtsView            from './components/OtsView.jsx';
+import OTDashboardView    from './components/OTDashboardView.jsx';
 import ControlCalidadView from './components/ControlCalidadView.jsx';
-import CargaMasivaView from './components/CargaMasivaView.jsx';
-
+import CargaMasivaView    from './components/CargaMasivaView.jsx';
+ 
 // ─── Topbar (con ThemeToggle) ─────────────────────────────────────
 function Topbar({ view, user, collapsed }) {
   const VIEW_LABELS = {
@@ -32,8 +33,7 @@ function Topbar({ view, user, collapsed }) {
     asignacion: 'Entrega a Técnico', devolucion: 'Devolución', 'reasignacion-ot': 'Reasignar OT',
     movimientos: 'Movimientos', reasignaciones: 'Historial Reasignaciones',
     bodegas: 'Bodegas', ot: 'Órdenes de Trabajo', 'carga-masiva': 'Carga Masiva',
-    'control-calidad': 'Control de Calidad QA', 'tecnico': 'Vista Técnico',
-    salidas: 'Salidas',
+    'control-calidad': 'Control de Calidad QA', tecnico: 'Vista Técnico', salidas: 'Salidas',
   };
   return (
     <div style={{
@@ -43,7 +43,7 @@ function Topbar({ view, user, collapsed }) {
       justifyContent: 'space-between',
       padding: '0 24px',
       borderBottom: '1px solid var(--border)',
-      background: 'var(--bg-sidebar)',  // ✅ variable para tema claro/oscuro
+      background: 'var(--bg-sidebar)',
       backdropFilter: 'blur(8px)',
       position: 'sticky',
       top: 0,
@@ -64,47 +64,54 @@ function Topbar({ view, user, collapsed }) {
     </div>
   );
 }
-
-// ─── App (envuelta con ThemeProvider) ─────────────────────────────
+ 
+// ─── App ──────────────────────────────────────────────────────────
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [view, setView] = useState('dashboard');
+  const [user, setUser]           = useState(null);
+  const [token, setToken]         = useState(null);
+  const [view, setView]           = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
-
-  // Data stores
-  const [bodegas, setBodegas] = useState([]);
-  const [inv, setInv] = useState([]);
-  const [mov, setMov] = useState([]);
-  const [ots, setOts] = useState([]);
+  // ← NUEVO: controla modal cambio de contraseña
+  const [debeCambiarPassword, setDebeCambiarPassword] = useState(false);
+ 
+  const [bodegas, setBodegas]       = useState([]);
+  const [inv, setInv]               = useState([]);
+  const [mov, setMov]               = useState([]);
+  const [ots, setOts]               = useState([]);
   const [materiales, setMateriales] = useState([]);
-  const [tecnicos, setTecnicos] = useState([]);
+  const [tecnicos, setTecnicos]     = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
-
+ 
+  // ─── helper: redirigir según rol ──────────────────────────────
+  const redirigirPorRol = (u) => {
+    const rol = String(u?.rol || u?.tipo || '').toLowerCase().trim();
+    if (rol === 'tecnico')              setView('tecnico');
+    else if (rol === 'control_calidad') setView('control-calidad');
+    else if (rol === 'preconfigurador') setView('ot-dashboard');
+    else                                setView('dashboard');
+  };
+ 
   /* ── restore session ── */
   useEffect(() => {
     const t = localStorage.getItem('token');
     const u = localStorage.getItem('user');
-
     if (t && u) {
       try {
         const parsedUser = JSON.parse(u);
-        const rol = String(parsedUser?.rol || parsedUser?.tipo || '').toLowerCase().trim();
-
         setToken(t);
         setUser(parsedUser);
-
-        if (rol === 'tecnico') {
-          setView('tecnico');
+        // ← NUEVO: si tenía pendiente cambiar password, mostrar modal
+        if (parsedUser?.debe_cambiar_password) {
+          setDebeCambiarPassword(true);
         } else {
-          setView('dashboard');
+          redirigirPorRol(parsedUser);
         }
       } catch {
         localStorage.clear();
       }
     }
   }, []);
-
+ 
   /* ── load all data ── */
   const loadAll = useCallback(async () => {
     if (!token) return;
@@ -118,10 +125,10 @@ export default function App() {
         http.get('/materiales'),
         http.get('/inventario/tecnicos'),
       ]);
-      if (b.status === 'fulfilled') setBodegas(Array.isArray(b.value) ? b.value : []);
-      if (i.status === 'fulfilled') setInv(Array.isArray(i.value) ? i.value : []);
-      if (m.status === 'fulfilled') setMov(Array.isArray(m.value?.data) ? m.value.data : Array.isArray(m.value) ? m.value : []);
-      if (o.status === 'fulfilled') setOts(Array.isArray(o.value?.data) ? o.value.data : Array.isArray(o.value) ? o.value : []);
+      if (b.status   === 'fulfilled') setBodegas(Array.isArray(b.value) ? b.value : []);
+      if (i.status   === 'fulfilled') setInv(Array.isArray(i.value) ? i.value : []);
+      if (m.status   === 'fulfilled') setMov(Array.isArray(m.value?.data) ? m.value.data : Array.isArray(m.value) ? m.value : []);
+      if (o.status   === 'fulfilled') setOts(Array.isArray(o.value?.data) ? o.value.data : Array.isArray(o.value) ? o.value : []);
       if (mat.status === 'fulfilled') setMateriales(Array.isArray(mat.value) ? mat.value : []);
       if (tec.status === 'fulfilled') {
         const list = Array.isArray(tec.value?.data) ? tec.value.data : Array.isArray(tec.value) ? tec.value : [];
@@ -133,11 +140,9 @@ export default function App() {
       setDataLoading(false);
     }
   }, [token]);
-
-  useEffect(() => {
-    if (token) loadAll();
-  }, [token]);
-
+ 
+  useEffect(() => { if (token) loadAll(); }, [token]);
+ 
   /* ── auth handlers ── */
   const handleLogin = (u, t) => {
     setUser(u);
@@ -145,56 +150,72 @@ export default function App() {
     localStorage.setItem('token', t);
     localStorage.setItem('user', JSON.stringify(u));
     window.CURRENT_USER_ID = u?.id;
-    const rol = String(u?.rol || u?.tipo || '').toLowerCase().trim();
-    if (rol === 'tecnico') setView('tecnico');
-    else setView('dashboard');
+    // ← NUEVO: bloquear si debe cambiar contraseña
+    if (u?.debe_cambiar_password) {
+      setDebeCambiarPassword(true);
+      return;
+    }
+    redirigirPorRol(u);
   };
-
+ 
   const handleLogout = () => {
     setUser(null);
     setToken(null);
+    setDebeCambiarPassword(false); // ← NUEVO: limpiar flag
     localStorage.clear();
     setView('dashboard');
-    setBodegas([]);
-    setInv([]);
-    setMov([]);
-    setOts([]);
-    setMateriales([]);
-    setTecnicos([]);
+    setBodegas([]); setInv([]); setMov([]); setOts([]); setMateriales([]); setTecnicos([]);
   };
-
+ 
   if (!user || !token) return <LoginView onLogin={handleLogin} />;
-
+ 
+  // ← NUEVO: bloquear toda la app hasta que cambie contraseña temporal
+  if (debeCambiarPassword) {
+    return (
+      <CambiarPasswordModal
+        user={user}
+        token={token}
+        onSuccess={() => {
+          const updatedUser = { ...user, debe_cambiar_password: false };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          setDebeCambiarPassword(false);
+          redirigirPorRol(updatedUser);
+        }}
+      />
+    );
+  }
+ 
   const common = { bodegas, inv, ots, materiales, tecnicos, refresh: loadAll };
-
+ 
   const renderView = () => {
     switch (view) {
-      case 'dashboard': return <DashboardView {...{ bodegas, inv, mov }} />;
-      case 'inventario': return <InventarioView {...common} />;
-      case 'ot-dashboard': return <OTDashboardView {...{ ots, inv, refresh: loadAll }} />;
-      case 'asignacion': return <AsignacionView {...common} />;
-      case 'devolucion': return <DevolucionView {...{ inv, refresh: loadAll }} />;
+      case 'dashboard':       return <DashboardView {...{ bodegas, inv, mov }} />;
+      case 'inventario':      return <InventarioView {...common} />;
+      case 'ot-dashboard':    return <OTDashboardView {...{ ots, inv, refresh: loadAll }} />;
+      case 'asignacion':      return <AsignacionView {...common} />;
+      case 'devolucion':      return <DevolucionView {...{ inv, refresh: loadAll }} />;
       case 'reasignacion-ot': return <ReasignacionOTView {...{ inv, ots, refresh: loadAll }} />;
-      case 'movimientos': return <MovimientosView />;
-      case 'reasignaciones': return <ReasignacionesView />;
-      case 'bodegas': return <BodegasView {...{ bodegas, inv, refresh: loadAll }} />;
-      case 'ot': return <OtsView {...{ ots, refresh: loadAll }} />;
-      case 'carga-masiva': return <CargaMasivaView {...{ bodegas, materiales, refresh: loadAll }} />;
+      case 'movimientos':     return <MovimientosView />;
+      case 'reasignaciones':  return <ReasignacionesView />;
+      case 'bodegas':         return <BodegasView {...{ bodegas, inv, refresh: loadAll }} />;
+      case 'ot':              return <OtsView {...{ ots, refresh: loadAll }} />;
+      case 'carga-masiva':    return <CargaMasivaView {...{ bodegas, materiales, refresh: loadAll }} />;
       case 'control-calidad': return <ControlCalidadView token={token} />;
-      case 'tecnico': return <TecnicoView {...{ user, token, refresh: loadAll }} />;
-      case 'salidas': return <SalidaView user={user} refresh={loadAll} />;
-      default: return <DashboardView {...{ bodegas, inv, mov }} />;
+      case 'tecnico':         return <TecnicoView {...{ user, token, refresh: loadAll }} />;
+      case 'salidas':         return <SalidaView user={user} refresh={loadAll} />;
+      default:                return <DashboardView {...{ bodegas, inv, mov }} />;
     }
   };
-
+ 
   const handleSetView = (v) => {
-      const rol = String(user?.rol || user?.tipo || '').toLowerCase().trim();
-      if (rol === 'tecnico'         && v !== 'tecnico')         return;
-      if (rol === 'control_calidad' && v !== 'control-calidad') return;
-      if (rol === 'preconfigurador' && v !== 'ot-dashboard')    return;
-      setView(v);
+    const rol = String(user?.rol || user?.tipo || '').toLowerCase().trim();
+    if (rol === 'tecnico'         && v !== 'tecnico')          return;
+    if (rol === 'control_calidad' && v !== 'control-calidad')  return;
+    if (rol === 'preconfigurador' && v !== 'ot-dashboard')     return;
+    setView(v);
   };
-
+ 
   return (
     <ThemeProvider>
       <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -206,10 +227,10 @@ export default function App() {
           collapsed={collapsed}
           setCollapsed={setCollapsed}
         />
-
+ 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <Topbar view={view} user={user} collapsed={collapsed} />
-
+ 
           <main style={{
             flex: 1,
             overflowY: 'auto',
@@ -226,7 +247,7 @@ export default function App() {
               renderView()
             )}
           </main>
-
+ 
           <div style={{
             height: 32,
             display: 'flex',
@@ -236,7 +257,7 @@ export default function App() {
             borderTop: '1px solid var(--border)',
             fontSize: 11,
             color: 'var(--text-muted)',
-            background: 'var(--bg-sidebar)',  // ✅ variable para tema claro/oscuro
+            background: 'var(--bg-sidebar)',
           }}>
             <span>BodegaOps v1.0 · Sistema de Inventario Multi-Bodega</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
