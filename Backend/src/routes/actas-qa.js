@@ -253,6 +253,7 @@ router.post('/', verifyToken, async (req, res) => {
         observaciones,
         pruebas_servicio,
         fotos,
+        campos_extra,
     } = req.body;
 
     if (!fecha_ejecucion || !hora_inicio)
@@ -290,11 +291,12 @@ router.post('/', verifyToken, async (req, res) => {
                 observaciones,
                 pruebas_servicio,
                 fotos,
+                campos_extra,
                 created_at
             ) VALUES (
                 $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
                 $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
-                $21,$22,$23,$24,$25,NOW()
+                $21,$22,$23,$24,$25,$26,NOW()
             ) RETURNING id`,
             [
                 tecnicoId,
@@ -323,6 +325,7 @@ router.post('/', verifyToken, async (req, res) => {
                 observaciones || null,
                 JSON.stringify(pruebas_servicio || {}),
                 JSON.stringify(fotos || []),
+                JSON.stringify(campos_extra || {}),
             ]
         );
         res.json({ success: true, id: result.rows[0].id, message: 'Acta guardada correctamente' });
