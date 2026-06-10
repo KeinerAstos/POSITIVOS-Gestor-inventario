@@ -1,16 +1,17 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
-
 const { Pool } = require('pg');
+
 const pool = new Pool({
-  host:     process.env.DB_HOST,
-  port:     parseInt(process.env.DB_PORT) || 5432,
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT) || 5432,
   database: process.env.DB_NAME,
-  user:     process.env.DB_USER,
+  user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
+  ssl: { rejectUnauthorized: false }   // <--- añadido para Neon
 });
 
 pool.on('error', (err) => {
   console.error('Error inesperado en el pool de PostgreSQL:', err);
 });
 
-module.exports = pool;
+module.exports = pool;   // <--- asegúrate de exportar solo el pool, no un objeto con pool dentro
