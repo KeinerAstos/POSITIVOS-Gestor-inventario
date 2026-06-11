@@ -181,8 +181,6 @@ function ModalPasswordTemporal({ nombre, password, onClose }) {
         <p style={{ fontSize: 13, color: "#94a3b8", margin: 0, lineHeight: 1.6 }}>
           Entrega esta contraseña temporal a <strong style={{ color: "#e2e8f0" }}>{nombre}</strong>. Al ingresar se le pedirá que la cambie por una nueva.
         </p>
-
-        {/* Password box */}
         <div style={{ width: "100%", background: "#0f1117", border: "1px solid #2d3748", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
             <span style={{ fontSize: 11, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em" }}>Contraseña temporal</span>
@@ -192,11 +190,9 @@ function ModalPasswordTemporal({ nombre, password, onClose }) {
             {copiado ? "✓ Copiado" : "Copiar"}
           </button>
         </div>
-
         <p style={{ fontSize: 12, color: "#475569", margin: 0 }}>
           Dísela a <strong style={{ color: "#94a3b8" }}>{nombre}</strong> — al ingresar se le pedirá que la cambie por una nueva.
         </p>
-
         <button onClick={onClose} style={{ width: "100%", padding: "10px 0", borderRadius: 8, background: "#1a2030", border: "1px solid #2d3748", color: "#94a3b8", fontSize: 14, cursor: "pointer" }}>
           Cerrar
         </button>
@@ -205,18 +201,71 @@ function ModalPasswordTemporal({ nombre, password, onClose }) {
   );
 }
 
+// ─── Modal: Solicitudes de reset ──────────────────────────────────────────────
+function ModalSolicitudes({ solicitudes, onAtender, onClose }) {
+  return (
+    <Modal title="Solicitudes de acceso pendientes" onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {solicitudes.length === 0 ? (
+          <p style={{ color: "#475569", fontSize: 13, textAlign: "center", padding: "1rem 0", margin: 0 }}>
+            No hay solicitudes pendientes.
+          </p>
+        ) : (
+          <>
+            <p style={{ fontSize: 12, color: "#475569", margin: "0 0 4px" }}>
+              {solicitudes.length} solicitud{solicitudes.length !== 1 ? "es" : ""} esperando atención.
+            </p>
+            {solicitudes.map((s) => (
+              <div
+                key={s.id}
+                style={{
+                  background: "#0f1117",
+                  border: "1px solid #2d3748",
+                  borderRadius: 9,
+                  padding: "12px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: "#f1f5f9", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {s.nombre}
+                  </p>
+                  <p style={{ margin: "3px 0 0", fontSize: 12, color: "#475569", fontFamily: "monospace" }}>
+                    {s.cedula} · {new Date(s.creado_en).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => onAtender(s)}
+                  style={{ ...{ background: "#1c1a0e", border: "1px solid #78520a", color: "#fbbf24", borderRadius: 7, padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }, flexShrink: 0 }}
+                >
+                  🔑 Resetear
+                </button>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function GestionUsuarios() {
-  const [usuarios, setUsuarios]         = useState([]);
-  const [bodegas, setBodegas]           = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [busqueda, setBusqueda]         = useState("");
-  const [filtroRol, setFiltroRol]       = useState("");
-  const [resetLoading, setResetLoading] = useState(null);
+  const [usuarios, setUsuarios]               = useState([]);
+  const [bodegas, setBodegas]                 = useState([]);
+  const [solicitudes, setSolicitudes]         = useState([]);
+  const [loading, setLoading]                 = useState(true);
+  const [busqueda, setBusqueda]               = useState("");
+  const [filtroRol, setFiltroRol]             = useState("");
+  const [resetLoading, setResetLoading]       = useState(null);
 
-  const [modalCrear, setModalCrear]         = useState(false);
-  const [modalEditar, setModalEditar]       = useState(null);
-  const [modalPassword, setModalPassword]   = useState(null);
+  const [modalCrear, setModalCrear]           = useState(false);
+  const [modalEditar, setModalEditar]         = useState(null);
+  const [modalPassword, setModalPassword]     = useState(null);
+  const [modalSolicitudes, setModalSolicitudes] = useState(false);
 
   const cargarUsuarios = useCallback(async () => {
     try {
@@ -234,7 +283,19 @@ export default function GestionUsuarios() {
     } catch { setBodegas([]); }
   }, []);
 
-  useEffect(() => { cargarUsuarios(); cargarBodegas(); }, [cargarUsuarios, cargarBodegas]);
+  const cargarSolicitudes = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/usuarios/solicitudes-reset/pendientes`, { headers: authHeaders() });
+      const data = await res.json();
+      setSolicitudes(Array.isArray(data) ? data : []);
+    } catch { setSolicitudes([]); }
+  }, []);
+
+  useEffect(() => {
+    cargarUsuarios();
+    cargarBodegas();
+    cargarSolicitudes();
+  }, [cargarUsuarios, cargarBodegas, cargarSolicitudes]);
 
   const handleReset = async (usuario) => {
     if (!window.confirm(`¿Resetear la contraseña de ${usuario.nombre}?`)) return;
@@ -245,6 +306,23 @@ export default function GestionUsuarios() {
       if (!res.ok) throw new Error(data.error);
       setModalPassword({ nombre: usuario.nombre, password: data.password_temporal });
     } catch (err) { alert("Error al resetear contraseña: " + err.message); } finally { setResetLoading(null); }
+  };
+
+  const handleAtenderSolicitud = async (solicitud) => {
+    try {
+      await fetch(`${API_BASE}/usuarios/solicitudes-reset/${solicitud.id}/atender`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      // Quitar de la lista local
+      setSolicitudes((prev) => prev.filter((s) => s.id !== solicitud.id));
+      setModalSolicitudes(false);
+      // Reusar el flujo de reset existente
+      const usuario = usuarios.find((u) => u.id === solicitud.usuario_id);
+      if (usuario) handleReset(usuario);
+    } catch (err) {
+      alert("Error al atender solicitud: " + err.message);
+    }
   };
 
   const usuariosFiltrados = usuarios.filter((u) => {
@@ -264,9 +342,40 @@ export default function GestionUsuarios() {
             <h1 style={darkStyles.title}>Usuarios del sistema</h1>
             <p style={darkStyles.subtitle}>{usuarios.length} usuarios registrados</p>
           </div>
-          <button onClick={() => setModalCrear(true)} style={darkStyles.btnPrimary}>
-            <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Nuevo usuario
-          </button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {/* Botón de solicitudes — solo aparece si hay pendientes */}
+            {solicitudes.length > 0 && (
+              <button
+                onClick={() => setModalSolicitudes(true)}
+                style={{
+                  ...darkStyles.btnPrimary,
+                  background: "#92400e",
+                  border: "1px solid #b45309",
+                  position: "relative",
+                }}
+              >
+                🔔 Solicitudes
+                <span style={{
+                  background: "#f59e0b",
+                  color: "#0f1117",
+                  borderRadius: "50%",
+                  width: 20,
+                  height: 20,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}>
+                  {solicitudes.length}
+                </span>
+              </button>
+            )}
+            <button onClick={() => setModalCrear(true)} style={darkStyles.btnPrimary}>
+              <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Nuevo usuario
+            </button>
+          </div>
         </div>
 
         {/* Filtros */}
@@ -311,9 +420,12 @@ export default function GestionUsuarios() {
                   {usuariosFiltrados.map((u) => {
                     const badge = ROL_BADGE[u.tipo_usuario] || { style: { background: "#1e2330", color: "#94a3b8", border: "1px solid #2d3748" }, label: u.tipo_usuario };
                     return (
-                      <tr key={u.id} style={{ transition: "background 0.15s" }}
+                      <tr
+                        key={u.id}
+                        style={{ transition: "background 0.15s" }}
                         onMouseEnter={(e) => e.currentTarget.style.background = "#1a2035"}
-                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                      >
                         <td style={darkStyles.tdMono}>{u.cedula}</td>
                         <td style={darkStyles.tdBold}>{u.nombre}</td>
                         <td style={darkStyles.td}>
@@ -377,6 +489,13 @@ export default function GestionUsuarios() {
           nombre={modalPassword.nombre}
           password={modalPassword.password}
           onClose={() => setModalPassword(null)}
+        />
+      )}
+      {modalSolicitudes && (
+        <ModalSolicitudes
+          solicitudes={solicitudes}
+          onAtender={handleAtenderSolicitud}
+          onClose={() => setModalSolicitudes(false)}
         />
       )}
     </div>

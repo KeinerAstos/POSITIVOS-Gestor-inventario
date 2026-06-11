@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { http } from '../api.js';
 import { Alert, Btn } from './UI.jsx';
+import OlvidePasswordModal from './OlvidePasswordModal.jsx';
 import '../styles/LoginView.css';
 import logoPositivo from '../assets/logo.png';
 import logoClaro from '../assets/Claro-logo.png';
 
 export default function LoginView({ onLogin }) {
-  const [form, setForm] = useState({ cedula: '', password: '' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [form, setForm]             = useState({ cedula: '', password: '' });
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [showOlvide, setShowOlvide] = useState(false);   // ← nuevo
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,8 +22,8 @@ export default function LoginView({ onLogin }) {
     setError('');
     try {
       const data = await http.post('/auth/login', {
-        cedula: form.cedula,
-        password: form.password
+        cedula:   form.cedula,
+        password: form.password,
       });
       if (data.token) {
         localStorage.setItem('token', data.token);
@@ -38,7 +40,6 @@ export default function LoginView({ onLogin }) {
 
   return (
     <div className="login-container">
-      {/* Degradado de fondo y patrón */}
       <div className="login-bg-gradient"></div>
       <div className="login-pattern"></div>
 
@@ -47,7 +48,6 @@ export default function LoginView({ onLogin }) {
         <div className="login-logos">
           <div className="logo-item">
             <img src={logoPositivo} alt="Positivo S+" className="logo-img" />
-
           </div>
           <div className="logo-separator">+</div>
           <div className="logo-item">
@@ -63,6 +63,7 @@ export default function LoginView({ onLogin }) {
 
         <form onSubmit={handleSubmit} className="login-form-card">
           <h2 className="login-form-title">Acceso al sistema</h2>
+
           {error && <Alert type="error" msg={error} onClose={() => setError('')} />}
 
           <div className="input-group">
@@ -93,11 +94,22 @@ export default function LoginView({ onLogin }) {
           </div>
 
           <Btn type="submit" loading={loading} className="login-btn">
-            Ingresar
+                            Ingresar
           </Btn>
 
+          {/* ── Enlace "¿Olvidó su contraseña?" ── */}
           <div className="login-extra">
-            <a href="#">¿Olvidó su contraseña?</a>
+            <button
+              type="button"
+              onClick={() => setShowOlvide(true)}
+              style={{
+                background: '#17ac86',    color: '#ffff',    border: 'none', 
+                borderRadius: '20px',    padding: '8px 20px',    cursor: 'pointer',
+                fontWeight: '600',    textDecoration: 'none',
+              }}
+            >
+              ¿Olvidó su contraseña?
+            </button>
           </div>
         </form>
 
@@ -106,6 +118,11 @@ export default function LoginView({ onLogin }) {
           <span className="footer-empresas">Positivo S+ · Claro · sTr</span>
         </p>
       </div>
+
+      {/* Modal de recuperación */}
+      {showOlvide && (
+        <OlvidePasswordModal onClose={() => setShowOlvide(false)} />
+      )}
     </div>
   );
 }
