@@ -111,5 +111,37 @@ router.get('/verify', async (req, res) => {
     res.status(401).json({ valid: false, error: err.message });
   }
 });
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res) => {
+  const { cedula } = req.body;
+  if (!cedula) return res.status(400).json({ error: 'La cédula es requerida' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, nombre FROM usuarios WHERE cedula = $1 AND activo = true`,
+      [cedula]
+    );
+
+    if (rows.length === 0) {
+      // Genérico — no revelar si existe o no
+      return res.json({ message: 'Solicitud registrada.', nombre: 'usuario' });
+    }
+
+    const user = rows[0];
+
+    await pool.query(
+      `INSERT INTO solicitudes_reset (usuario_id, cedula) VALUES ($1, $2)`,
+      [user.id, cedula]
+    );
+
+    // ← Devuelve el nombre para que el modal lo muestre
+    res.json({ message: 'Solicitud registrada.', nombre: user.nombre });
+
+  } catch (err) {
+    console.error('Error en forgot-password:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
  
 module.exports = router;

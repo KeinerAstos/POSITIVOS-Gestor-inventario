@@ -191,5 +191,69 @@ router.put('/:id/cambiar-password', verifyToken, async (req, res) => {
   }
 });
  
+// GET /api/usuarios/solicitudes-reset — admin ve las pendientes
+router.get('/solicitudes-reset/pendientes', verifyToken, async (req, res) => {
+  if (req.user.tipo !== 'ADMIN') return res.status(403).json({ error: 'Solo admin' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT sr.id, sr.cedula, sr.creado_en, u.nombre, u.id AS usuario_id
+       FROM solicitudes_reset sr
+       JOIN usuarios u ON u.id = sr.usuario_id
+       WHERE sr.estado = 'pendiente'
+       ORDER BY sr.creado_en DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/usuarios/solicitudes-reset/:id/atender — marcar como atendida
+router.post('/solicitudes-reset/:id/atender', verifyToken, async (req, res) => {
+  if (req.user.tipo !== 'ADMIN') return res.status(403).json({ error: 'Solo admin' });
+
+  try {
+    await pool.query(
+      `UPDATE solicitudes_reset SET estado = 'atendida' WHERE id = $1`,
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/usuarios/solicitudes-reset/pendientes
+router.get('/solicitudes-reset/pendientes', verifyToken, async (req, res) => {
+  if (req.user.tipo !== 'ADMIN') return res.status(403).json({ error: 'Solo admin' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT sr.id, sr.cedula, sr.creado_en, u.nombre, u.id AS usuario_id
+       FROM solicitudes_reset sr
+       JOIN usuarios u ON u.id = sr.usuario_id
+       WHERE sr.estado = 'pendiente'
+       ORDER BY sr.creado_en DESC`
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/usuarios/solicitudes-reset/:id/atender
+router.post('/solicitudes-reset/:id/atender', verifyToken, async (req, res) => {
+  if (req.user.tipo !== 'ADMIN') return res.status(403).json({ error: 'Solo admin' });
+  try {
+    await pool.query(
+      `UPDATE solicitudes_reset SET estado = 'atendida' WHERE id = $1`,
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
  
