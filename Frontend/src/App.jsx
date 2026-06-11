@@ -25,6 +25,8 @@ import OtsView            from './components/OtsView.jsx';
 import OTDashboardView    from './components/OTDashboardView.jsx';
 import ControlCalidadView from './components/ControlCalidadView.jsx';
 import CargaMasivaView    from './components/CargaMasivaView.jsx';
+import GestionUsuarios from './components/GestionUsuarios.jsx';
+
  
 // ─── Topbar (con ThemeToggle) ─────────────────────────────────────
 function Topbar({ view, user, collapsed }) {
@@ -33,7 +35,7 @@ function Topbar({ view, user, collapsed }) {
     asignacion: 'Entrega a Técnico', devolucion: 'Devolución', 'reasignacion-ot': 'Reasignar OT',
     movimientos: 'Movimientos', reasignaciones: 'Historial Reasignaciones',
     bodegas: 'Bodegas', ot: 'Órdenes de Trabajo', 'carga-masiva': 'Carga Masiva',
-    'control-calidad': 'Control de Calidad QA', tecnico: 'Vista Técnico', salidas: 'Salidas',
+    'control-calidad': 'Control de Calidad QA', tecnico: 'Vista Técnico', salidas: 'Salidas', usuarios: 'Gestión de Usuarios',
   };
   return (
     <div style={{
@@ -204,6 +206,7 @@ export default function App() {
       case 'control-calidad': return <ControlCalidadView token={token} />;
       case 'tecnico':         return <TecnicoView {...{ user, token, refresh: loadAll }} />;
       case 'salidas':         return <SalidaView user={user} refresh={loadAll} />;
+      case 'usuarios':        return <GestionUsuarios />;
       default:                return <DashboardView {...{ bodegas, inv, mov }} />;
     }
   };
