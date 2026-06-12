@@ -280,3 +280,35 @@
   text-align: right;
   flex-shrink: 0;
 }
+
+.inventario-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.inventario-pagination-info {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.inventario-pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inventario-pagination-actions select {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}

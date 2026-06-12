@@ -240,34 +240,113 @@ router.post('/asignar', async (req, res) => {
     client.release();
   }
 });
+
 router.get('/', async (req, res) => {
-  const { bodega_id, estado, material_id } = req.query;
+  const {
+    bodega_id,
+    estado,
+    material_id,
+    page = 1,
+    limit = 20,
+    search = ''
+  } = req.query;
+
   const filtros = [];
   const valores = [];
 
-  if (bodega_id) { valores.push(bodega_id); filtros.push(`i.bodega_id = $${valores.length}`); }
-  if (estado) { valores.push(estado); filtros.push(`i.estado = $${valores.length}`); }
-  if (material_id) { valores.push(material_id); filtros.push(`i.material_id = $${valores.length}`); }
+  const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
+  const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+  const offset = (pageNumber - 1) * limitNumber;
+
+  if (bodega_id) {
+    valores.push(bodega_id);
+    filtros.push(`i.bodega_id = $${valores.length}`);
+  }
+
+  if (estado) {
+    valores.push(estado);
+    filtros.push(`i.estado = $${valores.length}`);
+  }
+
+  if (material_id) {
+    valores.push(material_id);
+    filtros.push(`i.material_id = $${valores.length}`);
+  }
+
+  if (search && search.trim() !== '') {
+    valores.push(`%${search.trim()}%`);
+    const searchIndex = valores.length;
+
+    filtros.push(`
+      (
+        i.id::text ILIKE $${searchIndex}
+        OR i.material_id::text ILIKE $${searchIndex}
+        OR i.serie::text ILIKE $${searchIndex}
+        OR i.doc_material::text ILIKE $${searchIndex}
+        OR i.oth::text ILIKE $${searchIndex}
+        OR i.lote::text ILIKE $${searchIndex}
+        OR i.ubicacion::text ILIKE $${searchIndex}
+        OR i.estado::text ILIKE $${searchIndex}
+        OR m.descripcion::text ILIKE $${searchIndex}
+        OR b.nombre::text ILIKE $${searchIndex}
+        OR u.nombre::text ILIKE $${searchIndex}
+        OR ot.numero_ot::text ILIKE $${searchIndex}
+      )
+    `);
+  }
 
   const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
 
   try {
-    const { rows } = await pool.query(
-      `SELECT i.*,
-              m.descripcion AS material_descripcion,
-              b.nombre AS bodega_nombre,
-              u.nombre AS usuario_asignado_nombre,
-              ot.numero_ot
-       FROM inventario i
-       LEFT JOIN materiales m ON i.material_id = m.codigo_sap
-       LEFT JOIN bodegas b ON i.bodega_id = b.id
-       LEFT JOIN usuarios u ON i.usuario_asignado = u.id
-       LEFT JOIN ot ON i.ot_id = ot.id
-       ${where}
-       ORDER BY i.id DESC`,
-      valores
-    );
-    res.json(rows);
+    const countQuery = `
+      SELECT COUNT(*)::int AS total
+      FROM inventario i
+      LEFT JOIN materiales m ON i.material_id = m.codigo_sap
+      LEFT JOIN bodegas b ON i.bodega_id = b.id
+      LEFT JOIN usuarios u ON i.usuario_asignado = u.id
+      LEFT JOIN ot ON i.ot_id = ot.id
+      ${where}
+    `;
+
+    const dataQuery = `
+      SELECT 
+        i.*,
+        m.descripcion AS material_descripcion,
+        b.nombre AS bodega_nombre,
+        u.nombre AS usuario_asignado_nombre,
+        ot.numero_ot
+      FROM inventario i
+      LEFT JOIN materiales m ON i.material_id = m.codigo_sap
+      LEFT JOIN bodegas b ON i.bodega_id = b.id
+      LEFT JOIN usuarios u ON i.usuario_asignado = u.id
+      LEFT JOIN ot ON i.ot_id = ot.id
+      ${where}
+      ORDER BY i.id DESC
+      LIMIT $${valores.length + 1}
+      OFFSET $${valores.length + 2}
+    `;
+
+    const countResult = await pool.query(countQuery, valores);
+    const dataResult = await pool.query(dataQuery, [
+      ...valores,
+      limitNumber,
+      offset
+    ]);
+
+    const total = countResult.rows[0]?.total || 0;
+    const totalPages = Math.ceil(total / limitNumber);
+
+    res.json({
+      data: dataResult.rows,
+      pagination: {
+        page: pageNumber,
+        limit: limitNumber,
+        total,
+        totalPages,
+        hasNextPage: pageNumber < totalPages,
+        hasPreviousPage: pageNumber > 1
+      }
+    });
   } catch (err) {
     console.error('Error en GET /inventario:', err);
     res.status(500).json({ error: err.message });
@@ -1344,6 +1423,131 @@ router.get('/mis-equipos', verifyToken, async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('Error en /mis-equipos:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/export', async (req, res) => {
+  const { bodega_id, estado, material_id, search = '' } = req.query;
+
+  const filtros = [];
+  const valores = [];
+
+  if (bodega_id) {
+    valores.push(bodega_id);
+    filtros.push(`i.bodega_id = $${valores.length}`);
+  }
+
+  if (estado) {
+    valores.push(estado);
+    filtros.push(`i.estado = $${valores.length}`);
+  }
+
+  if (material_id) {
+    valores.push(material_id);
+    filtros.push(`i.material_id = $${valores.length}`);
+  }
+
+  if (search && search.trim() !== '') {
+    valores.push(`%${search.trim()}%`);
+    const idx = valores.length;
+
+    filtros.push(`
+      (
+        i.id::text ILIKE $${idx}
+        OR i.material_id::text ILIKE $${idx}
+        OR i.serial::text ILIKE $${idx}
+        OR i.documento_material::text ILIKE $${idx}
+        OR i.oth::text ILIKE $${idx}
+        OR i.lote::text ILIKE $${idx}
+        OR i.ubicacion::text ILIKE $${idx}
+        OR i.estado::text ILIKE $${idx}
+        OR m.descripcion::text ILIKE $${idx}
+        OR b.nombre::text ILIKE $${idx}
+        OR u.nombre::text ILIKE $${idx}
+        OR ot.numero_ot::text ILIKE $${idx}
+      )
+    `);
+  }
+
+  const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
+
+  const escapeCsv = (value) => {
+    if (value === null || value === undefined) return '';
+    return `"${String(value).replace(/"/g, '""')}"`;
+  };
+
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT 
+        i.cantidad,
+        i.material_id,
+        COALESCE(m.descripcion, i.descripcion) AS descripcion,
+        i.serial,
+        i.documento_material,
+        ot.numero_ot,
+        i.oth,
+        i.lote,
+        i.ubicacion,
+        b.nombre AS bodega_nombre,
+        i.estado,
+        u.nombre AS usuario_asignado_nombre
+      FROM inventario i
+      LEFT JOIN materiales m ON i.material_id = m.codigo_sap
+      LEFT JOIN bodegas b ON i.bodega_id = b.id
+      LEFT JOIN usuarios u ON i.usuario_asignado = u.id
+      LEFT JOIN ot ON i.ot_id = ot.id
+      ${where}
+      ORDER BY i.id DESC
+      `,
+      valores
+    );
+
+    const headers = [
+      'Cantidad',
+      'Código',
+      'Descripción',
+      'Serie',
+      'Doc. Material',
+      'OT',
+      'OTH',
+      'Lote',
+      'Ubicación',
+      'Bodega',
+      'Estado',
+      'Usuario Asignado'
+    ];
+
+    const csvRows = rows.map(row => [
+      row.cantidad ?? '',
+      row.material_id ?? '',
+      row.descripcion ?? '',
+      row.serial ?? '',
+      row.documento_material ?? '',
+      row.numero_ot ?? '',
+      row.oth ?? '',
+      row.lote ?? '',
+      row.ubicacion ?? '',
+      row.bodega_nombre ?? '',
+      row.estado ?? '',
+      row.usuario_asignado_nombre ?? ''
+    ].map(escapeCsv).join(','));
+
+    const csv = [
+      headers.map(escapeCsv).join(','),
+      ...csvRows
+    ].join('\n');
+
+    const fecha = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const nombreArchivo = `inventario_export_${fecha}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreArchivo}"`);
+
+    res.send('\uFEFF' + csv);
+  } catch (err) {
+    console.error('Error en GET /inventario/export:', err);
     res.status(500).json({ error: err.message });
   }
 });
