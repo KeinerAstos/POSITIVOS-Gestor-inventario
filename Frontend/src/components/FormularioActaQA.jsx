@@ -70,6 +70,32 @@ function normalizeTriStateValue(value) {
   return 'N/A';
 }
 
+function shouldRenderAsImageField(campo) {
+  const key = String(campo?.key || '').toLowerCase();
+  const label = String(campo?.label || '').toLowerCase();
+  const type = String(campo?.type || '').toLowerCase();
+
+  if (['image', 'photo', 'foto', 'file'].includes(type)) return true;
+
+  return (
+    key.startsWith('foto_') ||
+    key.includes('_foto_') ||
+    key.includes('evidencia') ||
+    key.includes('pantallazo') ||
+    key.includes('fotografia') ||
+    key.includes('fotografico') ||
+    key.includes('firmados') ||
+    key.includes('escane') ||
+    label.includes('foto') ||
+    label.includes('evidencia') ||
+    label.includes('pantallazo') ||
+    label.includes('fotografía') ||
+    label.includes('fotografico') ||
+    label.includes('firmados') ||
+    label.includes('escanear')
+  );
+}
+
 function buildInitialCamposExtra(schema) {
   const initial = {};
 
@@ -81,9 +107,211 @@ function buildInitialCamposExtra(schema) {
     if (campo.type === 'checkbox') {
       initial[campo.key] = false;
     }
+
+    if (shouldRenderAsImageField(campo)) {
+      initial[campo.key] = '';
+    }
   });
 
   return initial;
+}
+
+function fileToResizedDataUrl(file, maxWidth = 1000, maxHeight = 800, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('Solo se permiten imágenes JPG, PNG o WEBP.'));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const img = new Image();
+
+      img.onload = () => {
+        let { width, height } = img;
+
+        const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+
+      img.onerror = () => reject(new Error('No se pudo leer la imagen seleccionada.'));
+      img.src = reader.result;
+    };
+
+    reader.onerror = () => reject(new Error('No se pudo cargar el archivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function TablaEquipos({ items, onRemove }) {
+  if (!items.length) {
+    return (
+      <div
+        style={{
+          padding: '12px',
+          textAlign: 'center',
+          color: 'var(--text-muted)',
+          fontSize: 12,
+          background: 'rgba(255,255,255,0.02)',
+          borderRadius: 8,
+        }}
+      >
+        Sin equipos agregados. En el DOCX se diligenciará como N/A.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ overflowX: 'auto', marginTop: 10 }}>
+      <table>
+        <thead>
+          <tr>
+            {[
+              'Código SAP',
+              'Descripción',
+              'Serie',
+              'Placa',
+              'Tipo',
+              'Marca',
+              'Modelo',
+              'Ubicación',
+              '',
+            ].map(header => (
+              <th key={header}>{header}</th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {items.map((eq, index) => (
+            <tr key={`${eq.serial || 'eq'}-${index}`}>
+              <td className="mono" style={{ fontSize: 12 }}>{eq.sap}</td>
+              <td style={{ fontWeight: 500 }}>{eq.descripcion}</td>
+              <td className="mono" style={{ fontSize: 12 }}>{eq.serial}</td>
+              <td style={{ color: 'var(--text-muted)' }}>{eq.placa || '—'}</td>
+              <td>{eq.tipo || '—'}</td>
+              <td>{eq.marca || '—'}</td>
+              <td>{eq.modelo || '—'}</td>
+              <td>{eq.ubicacion || '—'}</td>
+              <td>
+                <button
+                  type="button"
+                  onClick={() => onRemove(index)}
+                  style={{
+                    background: 'rgba(239,68,68,0.12)',
+                    color: '#EF4444',
+                    border: '1px solid rgba(239,68,68,0.2)',
+                    borderRadius: 6,
+                    padding: '3px 10px',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                  }}
+                >
+                  ✕
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FilaManualEquipos({ val, setVal, onAdd }) {
+  const fields = [
+    ['sap', 'Código SAP'],
+    ['descripcion', 'Descripción'],
+    ['serial', 'Serie'],
+    ['placa', 'Placa'],
+    ['tipo', 'Tipo'],
+    ['marca', 'Marca'],
+    ['modelo', 'Modelo'],
+    ['ubicacion', 'Ubicación'],
+  ];
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        padding: '12px 14px',
+        background: 'rgba(255,255,255,0.02)',
+        borderRadius: 10,
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--text-muted)',
+          marginBottom: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+        }}
+      >
+        Agregar manualmente
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+          gap: 8,
+          alignItems: 'end',
+        }}
+      >
+        {fields.map(([key, placeholder]) => (
+          <input
+            key={key}
+            value={val[key] || ''}
+            onChange={e => {
+              const value = e.target.value;
+              setVal(prev => ({
+                ...prev,
+                [key]: value,
+              }));
+            }}
+            placeholder={placeholder}
+          />
+        ))}
+
+        <button
+          type="button"
+          onClick={onAdd}
+          style={{
+            padding: '8px 16px',
+            background: 'rgba(217,119,6,0.15)',
+            color: 'var(--amber-glow)',
+            border: '1px solid rgba(217,119,6,0.3)',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          + Agregar
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function FormularioActaQA({
@@ -205,6 +433,10 @@ export default function FormularioActaQA({
 
       if (campo.type === 'checkbox' && currentValue === undefined) {
         next[campo.key] = false;
+      }
+
+      if (shouldRenderAsImageField(campo) && currentValue === undefined) {
+        next[campo.key] = '';
       }
     });
 
@@ -393,6 +625,99 @@ export default function FormularioActaQA({
     }
   };
 
+  const renderImageField = (campo, value) => {
+    return (
+      <Field label={campo.label} required={campo.required}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            padding: 12,
+            border: '1px dashed var(--border)',
+            borderRadius: 10,
+            background: 'rgba(255,255,255,0.02)',
+          }}
+        >
+          {value ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <img
+                src={value}
+                alt={campo.label}
+                style={{
+                  width: 160,
+                  height: 110,
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'white',
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => setExtra(campo.key, '')}
+                style={{
+                  background: 'rgba(239,68,68,0.12)',
+                  color: '#EF4444',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: 8,
+                  padding: '7px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Quitar imagen
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                color: 'var(--text-muted)',
+                fontSize: 12,
+              }}
+            >
+              Sin imagen cargada. Si queda vacío, el DOCX mostrará espacio reservado para evidencia fotográfica.
+            </div>
+          )}
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={async e => {
+              const file = e.target.files?.[0];
+
+              if (!file) return;
+
+              try {
+                const dataUrl = await fileToResizedDataUrl(file);
+                setExtra(campo.key, dataUrl);
+              } catch (err) {
+                setAlert({
+                  type: 'error',
+                  msg: err.message,
+                });
+              } finally {
+                e.target.value = '';
+              }
+            }}
+          />
+
+          <small style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+            Recomendado: foto horizontal, buena luz. La plataforma comprime la imagen antes de guardar.
+          </small>
+        </div>
+      </Field>
+    );
+  };
+
   const renderDynamicField = (campo) => {
     const rawValue = form.campos_extra?.[campo.key];
 
@@ -401,11 +726,9 @@ export default function FormularioActaQA({
         ? normalizeTriStateValue(rawValue)
         : rawValue ?? '';
 
-    const isFoto = campo.key?.startsWith('foto_') || campo.key?.includes('_foto_');
-
-    const placeholder = isFoto
-      ? 'Pegue aquí la evidencia o deje el campo en blanco para reservar el espacio.'
-      : campo.placeholder || '';
+    if (shouldRenderAsImageField(campo)) {
+      return renderImageField(campo, value);
+    }
 
     if (campo.type === 'textarea') {
       return (
@@ -413,7 +736,7 @@ export default function FormularioActaQA({
           <textarea
             value={value}
             rows={campo.rows || 3}
-            placeholder={placeholder}
+            placeholder={campo.placeholder || ''}
             onChange={e => setExtra(campo.key, e.target.value)}
             style={{ resize: 'vertical' }}
           />
@@ -481,21 +804,21 @@ export default function FormularioActaQA({
         <input
           type={campo.type || 'text'}
           value={value}
-          placeholder={placeholder}
+          placeholder={campo.placeholder || ''}
           onChange={e => setExtra(campo.key, e.target.value)}
         />
       </Field>
     );
   };
 
-  const RenderCamposExtra = ({ group, title, icon, cols = 2 }) => {
-    const campos = camposByGroup(group);
+  const renderCamposExtra = (grupo) => {
+    const campos = camposByGroup(grupo.key);
 
     if (!campos.length) return null;
 
     return (
-      <SECTION title={title} icon={icon}>
-        <GRID cols={cols}>
+      <SECTION title={grupo.title} icon={grupo.icon}>
+        <GRID cols={grupo.cols || 2}>
           {campos.map(campo => (
             <React.Fragment key={campo.key}>
               {renderDynamicField(campo)}
@@ -505,146 +828,6 @@ export default function FormularioActaQA({
       </SECTION>
     );
   };
-
-  const TablaEquipos = ({ items, onRemove }) => (
-    items.length === 0 ? (
-      <div
-        style={{
-          padding: '12px',
-          textAlign: 'center',
-          color: 'var(--text-muted)',
-          fontSize: 12,
-          background: 'rgba(255,255,255,0.02)',
-          borderRadius: 8,
-        }}
-      >
-        Sin equipos agregados. En el DOCX se diligenciará como N/A.
-      </div>
-    ) : (
-      <div style={{ overflowX: 'auto', marginTop: 10 }}>
-        <table>
-          <thead>
-            <tr>
-              {[
-                'Código SAP',
-                'Descripción',
-                'Serie',
-                'Placa',
-                'Tipo',
-                'Marca',
-                'Modelo',
-                'Ubicación',
-                '',
-              ].map(header => (
-                <th key={header}>{header}</th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {items.map((eq, index) => (
-              <tr key={index}>
-                <td className="mono" style={{ fontSize: 12 }}>{eq.sap}</td>
-                <td style={{ fontWeight: 500 }}>{eq.descripcion}</td>
-                <td className="mono" style={{ fontSize: 12 }}>{eq.serial}</td>
-                <td style={{ color: 'var(--text-muted)' }}>{eq.placa || '—'}</td>
-                <td>{eq.tipo || '—'}</td>
-                <td>{eq.marca || '—'}</td>
-                <td>{eq.modelo || '—'}</td>
-                <td>{eq.ubicacion || '—'}</td>
-                <td>
-                  <button
-                    type="button"
-                    onClick={() => onRemove(index)}
-                    style={{
-                      background: 'rgba(239,68,68,0.12)',
-                      color: '#EF4444',
-                      border: '1px solid rgba(239,68,68,0.2)',
-                      borderRadius: 6,
-                      padding: '3px 10px',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                    }}
-                  >
-                    ✕
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )
-  );
-
-  const FilaManual = ({ val, setVal, onAdd }) => (
-    <div
-      style={{
-        marginTop: 14,
-        padding: '12px 14px',
-        background: 'rgba(255,255,255,0.02)',
-        borderRadius: 10,
-        border: '1px solid var(--border)',
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'var(--text-muted)',
-          marginBottom: 10,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-        }}
-      >
-        Agregar manualmente
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-          gap: 8,
-          alignItems: 'end',
-        }}
-      >
-        {[
-          ['sap', 'Código SAP'],
-          ['descripcion', 'Descripción'],
-          ['serial', 'Serie'],
-          ['placa', 'Placa'],
-          ['tipo', 'Tipo'],
-          ['marca', 'Marca'],
-          ['modelo', 'Modelo'],
-          ['ubicacion', 'Ubicación'],
-        ].map(([key, placeholder]) => (
-          <input
-            key={key}
-            value={val[key]}
-            onChange={e => setVal(prev => ({ ...prev, [key]: e.target.value }))}
-            placeholder={placeholder}
-          />
-        ))}
-
-        <button
-          type="button"
-          onClick={onAdd}
-          style={{
-            padding: '8px 16px',
-            background: 'rgba(217,119,6,0.15)',
-            color: 'var(--amber-glow)',
-            border: '1px solid rgba(217,119,6,0.3)',
-            borderRadius: 8,
-            cursor: 'pointer',
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          + Agregar
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="fade-in" style={{ maxWidth: 980, margin: '0 auto' }}>
@@ -899,7 +1082,7 @@ export default function FormularioActaQA({
             onRemove={quitarInst}
           />
 
-          <FilaManual
+          <FilaManualEquipos
             val={nuevoInst}
             setVal={setNuevoInst}
             onAdd={agregarInst}
@@ -914,7 +1097,7 @@ export default function FormularioActaQA({
             onRemove={quitarDesinst}
           />
 
-          <FilaManual
+          <FilaManualEquipos
             val={nuevoDesinst}
             setVal={setNuevoDesinst}
             onAdd={agregarDesinst}
@@ -923,13 +1106,9 @@ export default function FormularioActaQA({
       )}
 
       {(schema?.grupos || []).map(grupo => (
-        <RenderCamposExtra
-          key={grupo.key}
-          group={grupo.key}
-          title={grupo.title}
-          icon={grupo.icon}
-          cols={grupo.cols || 2}
-        />
+        <React.Fragment key={grupo.key}>
+          {renderCamposExtra(grupo)}
+        </React.Fragment>
       ))}
 
       {showSection('observaciones_cierre') && (

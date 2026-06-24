@@ -69,6 +69,21 @@ const f = ({ key, label, type = 'text', group, required = false, options, rows =
 const evidencia = (key, label, group = 'evidencias') =>
   f({ key, label, type: 'textarea', group, rows: 4 });
 
+const foto = (key, label, group = 'fotografico', required = false) =>
+  f({ key, label, type: 'image', group, required });
+
+const fotosBaseInstalacion = [
+  foto('foto_antes_instalacion', 'Foto antes de la instalación'),
+  foto('foto_despues_instalacion', 'Foto después de la instalación'),
+  foto('foto_marquillas_completas', 'Foto marquillas completas'),
+  foto('foto_tomas_electricas', 'Foto tomas eléctricas'),
+  foto('foto_voltaje_neutro_tierra', 'Foto voltaje [Relación Neutro-Tierra]'),
+];
+
+const fotoActaEntregaServicio = [
+  foto('foto_acta_entrega_servicio', 'Foto acta de entrega de servicio', 'foto_acta_entrega'),
+];
+
 const prueba = (key, label, group = 'pruebas', required = false) =>
   f({ key, label, type: 'select', group, required, options: SI_NO_NA });
 
@@ -118,11 +133,14 @@ export const QA_SCHEMAS = {
     nombre: 'Acta QA adición de teléfonos y capacitación',
     secciones: [...WITH_DESINSTALADOS, 'telefonia_funcionalidades', 'capacitacion'],
     grupos: [
+      { key: 'fotografico', title: 'Registro fotográfico', icon: 'ti-camera', cols: 2 },
       { key: 'telefonia_funcionalidades', title: 'Pruebas de servicios - Adición de teléfonos', icon: 'ti-phone-plus', cols: 3 },
       { key: 'capacitacion', title: 'Capacitación de usuarios', icon: 'ti-school', cols: 2 },
       { key: 'conexiones_entrega', title: 'Conexiones y entrega', icon: 'ti-plug-connected', cols: 2 },
+      { key: 'foto_acta_entrega', title: 'Foto acta de entrega de servicio', icon: 'ti-file-check', cols: 1 },
     ],
     camposExtra: [
+      ...fotosBaseInstalacion,
       prueba('srst_sin_wan_call_manager', 'SRST - sin WAN / sin Call Manager', 'telefonia_funcionalidades', true),
       prueba('movilidad_extensiones_password', 'Movilidad de extensiones / password', 'telefonia_funcionalidades'),
       prueba('rotacion_llamada_grupos', 'Rotación de llamada en grupos', 'telefonia_funcionalidades'),
@@ -154,6 +172,7 @@ export const QA_SCHEMAS = {
       f({ key: 'formatos_capacitacion_anexos', label: 'Formatos de capacitación firmados anexos', type: 'select', group: 'capacitacion', options: SI_NO_NA }),
       f({ key: 'observaciones_actividad', label: 'Observaciones de la actividad', type: 'textarea', group: 'capacitacion', rows: 4 }),
       ...conexionEntregaFields,
+      ...fotoActaEntregaServicio,
     ],
   },
 

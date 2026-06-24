@@ -3,12 +3,65 @@ const path = require('path');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
 const { getFormatoQa } = require('../config/formatos-qa');
+const ImageModule = require('docxtemplater-image-module-free');
+const sizeOf = require('image-size');
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates', 'qas');
 
 const FOTO_PLACEHOLDER = '[Espacio reservado para evidencia fotográfica]';
 const SIN_OBSERVACIONES = 'Sin observaciones';
 const NA = 'N/A';
+
+function isDataUrlImage(value) {
+  return typeof value === 'string' && value.startsWith('data:image/');
+}
+
+function dataUrlToBuffer(value) {
+  if (!isDataUrlImage(value)) return null;
+
+  const base64 = value.split(',')[1];
+
+  if (!base64) return null;
+
+  return Buffer.from(base64, 'base64');
+}
+
+function buildImageModule() {
+  return new ImageModule({
+    centered: false,
+
+    getImage(tagValue) {
+      if (!tagValue) return null;
+
+      const buffer = dataUrlToBuffer(tagValue);
+
+      if (!buffer) return null;
+
+      return buffer;
+    },
+
+    getSize(imgBuffer) {
+      try {
+        const dimensions = sizeOf(imgBuffer);
+
+        const maxWidth = 380;
+        const maxHeight = 260;
+
+        const width = dimensions.width || maxWidth;
+        const height = dimensions.height || maxHeight;
+
+        const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+
+        return [
+          Math.round(width * ratio),
+          Math.round(height * ratio),
+        ];
+      } catch {
+        return [360, 240];
+      }
+    },
+  });
+}
 
 function parseJsonMaybe(value, fallback) {
   if (!value) return fallback;
@@ -354,6 +407,7 @@ function renderDocxFromTemplate(templatePath, data) {
   console.log('[QA DOCX] tags detectados:', templateTags.length);
 
   const doc = new Docxtemplater(zip, {
+    modules: [buildImageModule()],
     paragraphLoop: true,
     linebreaks: true,
     nullGetter: () => '',
