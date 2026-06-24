@@ -194,25 +194,28 @@ export default function FormularioActaQA({
 
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || 'Error al guardar el acta QA');
+        throw new Error(e.detail || e.error || 'Error al guardar el acta QA');
       }
 
       const data = await res.json();
 
-      const pdfRes = await fetch(`/api/actas-qa/${data.id}/pdf`, {
+      const docxRes = await fetch(`/api/actas-qa/${data.id}/docx`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (pdfRes.ok) {
-        const blob = await pdfRes.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `acta_${payload.tipo_formato}_${data.id}.pdf`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+      if (!docxRes.ok) {
+        const e = await docxRes.json().catch(() => ({}));
+        throw new Error(e.detail || e.error || 'El acta se guardó, pero no se pudo generar el DOCX.');
       }
 
-      setAlert({ type: 'success', msg: `Acta #${data.id} guardada y PDF descargado.` });
+      const blob = await docxRes.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `acta_${payload.tipo_formato}_${data.id}.docx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+
+      setAlert({ type: 'success', msg: `Acta #${data.id} guardada y DOCX descargado.` });
       setTimeout(() => onSuccess?.(), 1200);
     } catch (err) {
       setAlert({ type: 'error', msg: err.message });
@@ -221,63 +224,75 @@ export default function FormularioActaQA({
     }
   };
 
-  const DynamicField = ({ campo }) => {
-    const value = form.campos_extra?.[campo.key] ?? '';
+  const renderDynamicField = (campo) => {
+  const value = form.campos_extra?.[campo.key] ?? '';
 
-    if (campo.type === 'textarea') {
-      return (
-        <Field label={campo.label} required={campo.required}>
-          <textarea
-            value={value}
-            rows={campo.rows || 3}
-            placeholder={campo.placeholder || ''}
-            onChange={e => setExtra(campo.key, e.target.value)}
-            style={{ resize: 'vertical' }}
-          />
-        </Field>
-      );
-    }
-
-    if (campo.type === 'select') {
-      return (
-        <Field label={campo.label} required={campo.required}>
-          <select value={value} onChange={e => setExtra(campo.key, e.target.value)}>
-            <option value="">-- Seleccionar --</option>
-            {(campo.options || []).map(opt => (
-              <option key={opt.value || opt} value={opt.value || opt}>
-                {opt.label || opt}
-              </option>
-            ))}
-          </select>
-        </Field>
-      );
-    }
-
-    if (campo.type === 'checkbox') {
-      return (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
-          <input
-            type="checkbox"
-            checked={Boolean(value)}
-            onChange={e => setExtra(campo.key, e.target.checked)}
-            style={{ width: 'auto' }}
-          />
-          <span style={{ fontSize: 13, fontWeight: 500 }}>{campo.label}</span>
-        </label>
-      );
-    }
-
+  if (campo.type === 'textarea') {
     return (
       <Field label={campo.label} required={campo.required}>
-        <input
-          type={campo.type || 'text'}
+        <textarea
           value={value}
+          rows={campo.rows || 3}
           placeholder={campo.placeholder || ''}
           onChange={e => setExtra(campo.key, e.target.value)}
+          style={{ resize: 'vertical' }}
         />
       </Field>
     );
-  };
+  }
+
+  if (campo.type === 'select') {
+    return (
+      <Field label={campo.label} required={campo.required}>
+        <select
+          value={value}
+          onChange={e => setExtra(campo.key, e.target.value)}
+        >
+          <option value="">-- Seleccionar --</option>
+          {(campo.options || []).map(opt => (
+            <option key={opt.value || opt} value={opt.value || opt}>
+              {opt.label || opt}
+            </option>
+          ))}
+        </select>
+      </Field>
+    );
+  }
+
+  if (campo.type === 'checkbox') {
+    return (
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          cursor: 'pointer',
+          padding: '8px 14px',
+          borderRadius: 10,
+          border: '1px solid var(--border)',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={Boolean(form.campos_extra?.[campo.key])}
+          onChange={e => setExtra(campo.key, e.target.checked)}
+        />
+        <span>{campo.label}</span>
+      </label>
+    );
+  }
+
+  return (
+    <Field label={campo.label} required={campo.required}>
+      <input
+        type={campo.type || 'text'}
+        value={value}
+        placeholder={campo.placeholder || ''}
+        onChange={e => setExtra(campo.key, e.target.value)}
+      />
+    </Field>
+  );
+};
 
   const RenderCamposExtra = ({ group, title, icon, cols = 2 }) => {
     const campos = camposByGroup(group);
@@ -286,7 +301,11 @@ export default function FormularioActaQA({
     return (
       <SECTION title={title} icon={icon}>
         <GRID cols={cols}>
-          {campos.map(campo => <DynamicField key={campo.key} campo={campo} />)}
+          {camposByGroup('algo').map(campo => (
+            <React.Fragment key={campo.key}>
+              {renderDynamicField(campo)}
+            </React.Fragment>
+          ))}
         </GRID>
       </SECTION>
     );

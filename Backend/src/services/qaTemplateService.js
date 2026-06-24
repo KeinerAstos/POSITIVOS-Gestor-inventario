@@ -2,17 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const PizZip = require('pizzip');
 const Docxtemplater = require('docxtemplater');
-const libre = require('libreoffice-convert');
-const { promisify } = require('util');
 const { getFormatoQa } = require('../config/formatos-qa');
-
-const convertAsync = promisify(libre.convert);
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates', 'qas');
 
 function parseJsonMaybe(value, fallback) {
   if (!value) return fallback;
-
   if (typeof value === 'object') return value;
 
   try {
@@ -61,7 +56,7 @@ function normalizarEquipo(eq = {}, index = 0) {
   };
 }
 
-function addEquipoAliases(target, prefix, equipos = [], max = 6) {
+function addEquipoAliases(target, prefix, equipos = [], max = 8) {
   for (let i = 0; i < max; i++) {
     const eq = equipos[i] || {};
     const n = i + 1;
@@ -74,6 +69,30 @@ function addEquipoAliases(target, prefix, equipos = [], max = 6) {
     target[`${prefix}_${n}_sap`] = safeText(eq.sap || eq.material_id);
     target[`${prefix}_${n}_descripcion`] = safeText(eq.descripcion || eq.material_descripcion);
   }
+}
+
+/**
+ * Convierte campos SI/NO/N/A en tags separados:
+ * campo = "SI" genera:
+ * campo_si = "X"
+ * campo_no = ""
+ * campo_na = ""
+ */
+function addTriStateTags(target, source = {}) {
+  Object.entries(source).forEach(([key, value]) => {
+    const normalized =
+      typeof value === 'string'
+        ? value.trim().toUpperCase()
+        : value === true
+          ? 'SI'
+          : value === false
+            ? 'NO'
+            : '';
+
+    target[`${key}_si`] = normalized === 'SI' ? 'X' : '';
+    target[`${key}_no`] = normalized === 'NO' ? 'X' : '';
+    target[`${key}_na`] = normalized === 'N/A' || normalized === 'NA' ? 'X' : '';
+  });
 }
 
 function buildTemplateData(acta) {
@@ -116,9 +135,9 @@ function buildTemplateData(acta) {
     analizador_ber: safeText(acta.analizador_ber),
     soporte_claro: safeText(acta.soporte_claro),
 
-    firma_acta: acta.firma_acta ? 'SI' : 'NO',
-    caso_seguimiento: acta.caso_seguimiento ? 'SI' : 'NO',
-    problemas_instalacion: acta.problemas_instalacion ? 'SI' : 'NO',
+    firma_acta: boolSiNo(acta.firma_acta),
+    caso_seguimiento: boolSiNo(acta.caso_seguimiento),
+    problemas_instalacion: boolSiNo(acta.problemas_instalacion),
 
     firma_acta_x_si: acta.firma_acta ? 'X' : '',
     firma_acta_x_no: !acta.firma_acta ? 'X' : '',
@@ -154,10 +173,21 @@ function buildTemplateData(acta) {
 
     fotos,
     campos_extra: camposExtra,
+
+    foto_antes_instalacion: safeText(camposExtra.foto_antes_instalacion || ''),
+    foto_despues_instalacion: safeText(camposExtra.foto_despues_instalacion || ''),
+    foto_marquillas_completas: safeText(camposExtra.foto_marquillas_completas || ''),
+    foto_tomas_electricas: safeText(camposExtra.foto_tomas_electricas || ''),
+    foto_voltaje_neutro_tierra: safeText(camposExtra.foto_voltaje_neutro_tierra || ''),
+    foto_acta_entrega_servicio: safeText(camposExtra.foto_acta_entrega_servicio || ''),
+
+    foto_marquillas: safeText(camposExtra.foto_marquillas || ''),
+    foto_voltaje: safeText(camposExtra.foto_voltaje || ''),
   };
 
   addEquipoAliases(data, 'equipo_instalado', equiposInstalados, 8);
   addEquipoAliases(data, 'equipo_desinstalado', equiposDesinstalados, 8);
+  addTriStateTags(data, camposExtra);
 
   return data;
 }
@@ -176,7 +206,17 @@ function renderDocxFromTemplate(templatePath, data) {
     nullGetter: () => '',
   });
 
-  doc.render(data);
+  try {
+    doc.render(data);
+  } catch (error) {
+    console.error('[DOCXTEMPLATER ERROR]', JSON.stringify({
+      message: error.message,
+      name: error.name,
+      properties: error.properties,
+    }, null, 2));
+
+    throw error;
+  }
 
   return doc.getZip().generate({
     type: 'nodebuffer',
@@ -184,13 +224,14 @@ function renderDocxFromTemplate(templatePath, data) {
   });
 }
 
-async function convertDocxBufferToPdf(docxBuffer) {
-  return await convertAsync(docxBuffer, '.pdf', undefined);
-}
-
-async function generarPdfActaQa(acta) {
-  const formato = getFormatoQa(acta.tipo_formato);
+async function generarDocxActaQa(acta) {
+  const formato = getFormatoQa(acta.tipo_formato || 'qa_mpls');
   const templatePath = path.join(TEMPLATES_DIR, formato.archivo);
+
+  console.log('[QA DOCX] tipo_formato:', acta.tipo_formato);
+  console.log('[QA DOCX] archivo plantilla:', formato.archivo);
+  console.log('[QA DOCX] templatePath:', templatePath);
+  console.log('[QA DOCX] existe plantilla:', fs.existsSync(templatePath));
 
   const data = buildTemplateData({
     ...acta,
@@ -200,16 +241,16 @@ async function generarPdfActaQa(acta) {
   });
 
   const docxBuffer = renderDocxFromTemplate(templatePath, data);
-  const pdfBuffer = await convertDocxBufferToPdf(docxBuffer);
 
   return {
-    pdfBuffer,
-    filename: `acta_qa_${formato.id}_${acta.id}.pdf`,
+    docxBuffer,
+    filename: `acta_qa_${formato.id}_${acta.id}.docx`,
     formato,
   };
 }
 
 module.exports = {
-  generarPdfActaQa,
+  generarDocxActaQa,
   buildTemplateData,
+  renderDocxFromTemplate,
 };
