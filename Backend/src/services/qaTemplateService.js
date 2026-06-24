@@ -6,6 +6,10 @@ const { getFormatoQa } = require('../config/formatos-qa');
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates', 'qas');
 
+const FOTO_PLACEHOLDER = '[Espacio reservado para evidencia fotográfica]';
+const SIN_OBSERVACIONES = 'Sin observaciones';
+const NA = 'N/A';
+
 function parseJsonMaybe(value, fallback) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;
@@ -19,7 +23,12 @@ function parseJsonMaybe(value, fallback) {
 
 function safeText(value, fallback = '') {
   if (value === null || value === undefined) return fallback;
-  return String(value);
+
+  const text = String(value);
+
+  if (text.trim() === '') return fallback;
+
+  return text;
 }
 
 function formatDateCo(value) {
@@ -43,16 +52,16 @@ function boolSiNo(value) {
 function normalizarEquipo(eq = {}, index = 0) {
   return {
     item: index + 1,
-    sap: safeText(eq.sap || eq.material_id),
-    codigo_sap: safeText(eq.sap || eq.material_id),
-    descripcion: safeText(eq.descripcion || eq.material_descripcion),
-    serial: safeText(eq.serial),
-    placa: safeText(eq.placa),
-    tipo: safeText(eq.tipo),
-    marca: safeText(eq.marca),
-    modelo: safeText(eq.modelo),
-    ubicacion: safeText(eq.ubicacion),
-    cantidad: safeText(eq.cantidad || 1),
+    sap: safeText(eq.sap || eq.material_id, NA),
+    codigo_sap: safeText(eq.sap || eq.material_id, NA),
+    descripcion: safeText(eq.descripcion || eq.material_descripcion, NA),
+    serial: safeText(eq.serial, NA),
+    placa: safeText(eq.placa, NA),
+    tipo: safeText(eq.tipo, NA),
+    marca: safeText(eq.marca, NA),
+    modelo: safeText(eq.modelo, NA),
+    ubicacion: safeText(eq.ubicacion, NA),
+    cantidad: safeText(eq.cantidad || 1, '1'),
   };
 }
 
@@ -61,38 +70,163 @@ function addEquipoAliases(target, prefix, equipos = [], max = 8) {
     const eq = equipos[i] || {};
     const n = i + 1;
 
-    target[`${prefix}_${n}_tipo`] = safeText(eq.tipo);
-    target[`${prefix}_${n}_marca`] = safeText(eq.marca);
-    target[`${prefix}_${n}_modelo`] = safeText(eq.modelo);
-    target[`${prefix}_${n}_serial`] = safeText(eq.serial);
-    target[`${prefix}_${n}_placa`] = safeText(eq.placa);
-    target[`${prefix}_${n}_sap`] = safeText(eq.sap || eq.material_id);
-    target[`${prefix}_${n}_descripcion`] = safeText(eq.descripcion || eq.material_descripcion);
+    target[`${prefix}_${n}_tipo`] = safeText(eq.tipo, NA);
+    target[`${prefix}_${n}_marca`] = safeText(eq.marca, NA);
+    target[`${prefix}_${n}_modelo`] = safeText(eq.modelo, NA);
+    target[`${prefix}_${n}_serial`] = safeText(eq.serial, NA);
+    target[`${prefix}_${n}_placa`] = safeText(eq.placa, NA);
+    target[`${prefix}_${n}_sap`] = safeText(eq.sap || eq.material_id, NA);
+    target[`${prefix}_${n}_descripcion`] = safeText(eq.descripcion || eq.material_descripcion, NA);
   }
+}
+
+function normalizarTriState(value) {
+  if (value === true) return 'SI';
+  if (value === false) return 'NO';
+
+  const text = safeText(value).trim().toUpperCase();
+
+  if (text === 'SI' || text === 'SÍ' || text === 'YES' || text === 'TRUE' || text === '1') return 'SI';
+  if (text === 'NO' || text === 'FALSE' || text === '0') return 'NO';
+  if (text === 'N/A' || text === 'NA' || text === 'NO APLICA') return 'N/A';
+
+  return '';
 }
 
 /**
  * Convierte campos SI/NO/N/A en tags separados:
+ *
  * campo = "SI" genera:
  * campo_si = "X"
  * campo_no = ""
  * campo_na = ""
+ *
+ * campo vacío genera por defecto:
+ * campo_si = ""
+ * campo_no = ""
+ * campo_na = "X"
  */
+function setTriState(target, key, value, defaultValue = 'N/A') {
+  const normalized = normalizarTriState(value) || defaultValue;
+
+  target[`${key}_si`] = normalized === 'SI' ? 'X' : '';
+  target[`${key}_no`] = normalized === 'NO' ? 'X' : '';
+  target[`${key}_na`] = normalized === 'N/A' ? 'X' : '';
+}
+
 function addTriStateTags(target, source = {}) {
   Object.entries(source).forEach(([key, value]) => {
-    const normalized =
-      typeof value === 'string'
-        ? value.trim().toUpperCase()
-        : value === true
-          ? 'SI'
-          : value === false
-            ? 'NO'
-            : '';
-
-    target[`${key}_si`] = normalized === 'SI' ? 'X' : '';
-    target[`${key}_no`] = normalized === 'NO' ? 'X' : '';
-    target[`${key}_na`] = normalized === 'N/A' || normalized === 'NA' ? 'X' : '';
+    setTriState(target, key, value, 'N/A');
   });
+}
+
+function collectTemplateTagsFromZip(zip) {
+  const tags = new Set();
+
+  Object.keys(zip.files || {}).forEach((fileName) => {
+    if (!fileName.startsWith('word/')) return;
+    if (!fileName.endsWith('.xml')) return;
+
+    try {
+      const xml = zip.files[fileName].asText();
+
+      const regex = /\{([a-zA-Z0-9_]+)\}/g;
+      let match;
+
+      while ((match = regex.exec(xml)) !== null) {
+        if (match[1]) tags.add(match[1]);
+      }
+    } catch {
+      // Ignorar XML que no se pueda leer.
+    }
+  });
+
+  return [...tags];
+}
+
+/**
+ * Detecta en la plantilla todos los tags terminados en:
+ * _si, _no, _na
+ *
+ * Si existe el grupo y el usuario no lo envió, marca N/A.
+ */
+function applyTriStateDefaultsFromTemplateTags(data, tags) {
+  const bases = new Set();
+
+  tags.forEach((tag) => {
+    const match = tag.match(/^(.+)_(si|no|na)$/i);
+    if (!match) return;
+
+    bases.add(match[1]);
+  });
+
+  bases.forEach((base) => {
+    const hasAny =
+      safeText(data[`${base}_si`]).trim() ||
+      safeText(data[`${base}_no`]).trim() ||
+      safeText(data[`${base}_na`]).trim();
+
+    if (!hasAny) {
+      setTriState(data, base, data[base], 'N/A');
+    }
+  });
+}
+
+function applyPhotoDefaultsFromTemplateTags(data, tags) {
+  tags.forEach((tag) => {
+    const isFoto =
+      tag.startsWith('foto_') ||
+      tag.includes('_foto_') ||
+      tag.includes('fotografico') ||
+      tag.includes('fotografica');
+
+    if (!isFoto) return;
+
+    data[tag] = safeText(data[tag], FOTO_PLACEHOLDER);
+  });
+}
+
+function applyEquipoDefaultsFromTemplateTags(data, tags) {
+  tags.forEach((tag) => {
+    const isEquipo =
+      tag.startsWith('equipo_instalado_') ||
+      tag.startsWith('equipo_desinstalado_');
+
+    if (!isEquipo) return;
+
+    data[tag] = safeText(data[tag], NA);
+  });
+}
+
+function applyObservacionesDefaultsFromTemplateTags(data, tags) {
+  tags.forEach((tag) => {
+    const isObservacion =
+      tag === 'observaciones' ||
+      tag.startsWith('observaciones_') ||
+      tag.includes('_observaciones');
+
+    if (!isObservacion) return;
+
+    data[tag] = safeText(data[tag], SIN_OBSERVACIONES);
+  });
+}
+
+function applyGeneralDefaultsFromTemplateTags(data, tags) {
+  tags.forEach((tag) => {
+    if (data[tag] === undefined || data[tag] === null) {
+      data[tag] = '';
+    }
+  });
+}
+
+function applyTemplateDefaults(data, tags) {
+  applyTriStateDefaultsFromTemplateTags(data, tags);
+  applyPhotoDefaultsFromTemplateTags(data, tags);
+  applyEquipoDefaultsFromTemplateTags(data, tags);
+  applyObservacionesDefaultsFromTemplateTags(data, tags);
+  applyGeneralDefaultsFromTemplateTags(data, tags);
+
+  return data;
 }
 
 function buildTemplateData(acta) {
@@ -125,15 +259,15 @@ function buildTemplateData(acta) {
     hora_inicio: safeText(acta.hora_inicio),
     hora_salida: safeText(acta.hora_salida),
 
-    tiempo_transporte: safeText(acta.tiempo_transporte),
-    tiempo_antesala: safeText(acta.tiempo_antesala),
-    tiempo_ejecucion: safeText(acta.tiempo_ejecucion),
-    tiempo_espera_claro: safeText(acta.tiempo_espera_claro),
+    tiempo_transporte: safeText(acta.tiempo_transporte, '0'),
+    tiempo_antesala: safeText(acta.tiempo_antesala, '0'),
+    tiempo_ejecucion: safeText(acta.tiempo_ejecucion, '0'),
+    tiempo_espera_claro: safeText(acta.tiempo_espera_claro, '0'),
 
-    ingeniero_outsourcing: safeText(acta.ingeniero_outsourcing),
-    multimetro: safeText(acta.multimetro),
-    analizador_ber: safeText(acta.analizador_ber),
-    soporte_claro: safeText(acta.soporte_claro),
+    ingeniero_outsourcing: safeText(acta.ingeniero_outsourcing, NA),
+    multimetro: safeText(acta.multimetro, NA),
+    analizador_ber: safeText(acta.analizador_ber, NA),
+    soporte_claro: safeText(acta.soporte_claro, NA),
 
     firma_acta: boolSiNo(acta.firma_acta),
     caso_seguimiento: boolSiNo(acta.caso_seguimiento),
@@ -148,23 +282,23 @@ function buildTemplateData(acta) {
     problemas_instalacion_x_si: acta.problemas_instalacion ? 'X' : '',
     problemas_instalacion_x_no: !acta.problemas_instalacion ? 'X' : '',
 
-    fase_neutro: safeText(med.fase_neutro),
-    fase_tierra: safeText(med.fase_tierra),
-    neutro_tierra: safeText(med.neutro_tierra),
+    fase_neutro: safeText(med.fase_neutro, NA),
+    fase_tierra: safeText(med.fase_tierra, NA),
+    neutro_tierra: safeText(med.neutro_tierra, NA),
 
-    lugar_instalacion: safeText(acta.lugar_instalacion),
-    observaciones: safeText(acta.observaciones),
+    lugar_instalacion: safeText(acta.lugar_instalacion, NA),
+    observaciones: safeText(acta.observaciones, SIN_OBSERVACIONES),
 
-    ping_central: safeText(pruebas.ping_central),
-    traceroute: safeText(pruebas.traceroute),
-    firmware: safeText(pruebas.firmware),
-    ping_extranet: safeText(pruebas.ping_extranet),
-    encripcion: safeText(pruebas.encripcion),
-    firmware_info: safeText(pruebas.firmware_info),
-    config_router: safeText(pruebas.config_router),
-    arp: safeText(pruebas.arp),
-    ping_lan: safeText(pruebas.ping_lan),
-    config_cpe: safeText(pruebas.config_cpe),
+    ping_central: safeText(pruebas.ping_central, NA),
+    traceroute: safeText(pruebas.traceroute, NA),
+    firmware: safeText(pruebas.firmware, NA),
+    ping_extranet: safeText(pruebas.ping_extranet, NA),
+    encripcion: safeText(pruebas.encripcion, NA),
+    firmware_info: safeText(pruebas.firmware_info, NA),
+    config_router: safeText(pruebas.config_router, NA),
+    arp: safeText(pruebas.arp, NA),
+    ping_lan: safeText(pruebas.ping_lan, NA),
+    config_cpe: safeText(pruebas.config_cpe, NA),
 
     equipos_instalados: equiposInstalados.map(normalizarEquipo),
     equipos_desinstalados: equiposDesinstalados.map(normalizarEquipo),
@@ -174,19 +308,33 @@ function buildTemplateData(acta) {
     fotos,
     campos_extra: camposExtra,
 
-    foto_antes_instalacion: safeText(camposExtra.foto_antes_instalacion || ''),
-    foto_despues_instalacion: safeText(camposExtra.foto_despues_instalacion || ''),
-    foto_marquillas_completas: safeText(camposExtra.foto_marquillas_completas || ''),
-    foto_tomas_electricas: safeText(camposExtra.foto_tomas_electricas || ''),
-    foto_voltaje_neutro_tierra: safeText(camposExtra.foto_voltaje_neutro_tierra || ''),
-    foto_acta_entrega_servicio: safeText(camposExtra.foto_acta_entrega_servicio || ''),
+    foto_antes_instalacion: safeText(camposExtra.foto_antes_instalacion, FOTO_PLACEHOLDER),
+    foto_despues_instalacion: safeText(camposExtra.foto_despues_instalacion, FOTO_PLACEHOLDER),
+    foto_marquillas_completas: safeText(camposExtra.foto_marquillas_completas, FOTO_PLACEHOLDER),
+    foto_tomas_electricas: safeText(camposExtra.foto_tomas_electricas, FOTO_PLACEHOLDER),
+    foto_voltaje_neutro_tierra: safeText(camposExtra.foto_voltaje_neutro_tierra, FOTO_PLACEHOLDER),
+    foto_acta_entrega_servicio: safeText(camposExtra.foto_acta_entrega_servicio, FOTO_PLACEHOLDER),
 
-    foto_marquillas: safeText(camposExtra.foto_marquillas || ''),
-    foto_voltaje: safeText(camposExtra.foto_voltaje || ''),
+    foto_marquillas: safeText(camposExtra.foto_marquillas, FOTO_PLACEHOLDER),
+    foto_voltaje: safeText(camposExtra.foto_voltaje, FOTO_PLACEHOLDER),
+
+    observaciones_capacitacion_usuarios: safeText(
+      camposExtra.observaciones_capacitacion_usuarios,
+      SIN_OBSERVACIONES
+    ),
+    formatos_capacitacion_firmados: safeText(
+      camposExtra.formatos_capacitacion_firmados,
+      FOTO_PLACEHOLDER
+    ),
+    observaciones_actividad: safeText(
+      camposExtra.observaciones_actividad,
+      SIN_OBSERVACIONES
+    ),
   };
 
   addEquipoAliases(data, 'equipo_instalado', equiposInstalados, 8);
   addEquipoAliases(data, 'equipo_desinstalado', equiposDesinstalados, 8);
+
   addTriStateTags(data, camposExtra);
 
   return data;
@@ -200,6 +348,11 @@ function renderDocxFromTemplate(templatePath, data) {
   const content = fs.readFileSync(templatePath, 'binary');
   const zip = new PizZip(content);
 
+  const templateTags = collectTemplateTagsFromZip(zip);
+  const finalData = applyTemplateDefaults({ ...data }, templateTags);
+
+  console.log('[QA DOCX] tags detectados:', templateTags.length);
+
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
     linebreaks: true,
@@ -207,7 +360,7 @@ function renderDocxFromTemplate(templatePath, data) {
   });
 
   try {
-    doc.render(data);
+    doc.render(finalData);
   } catch (error) {
     console.error('[DOCXTEMPLATER ERROR]', JSON.stringify({
       message: error.message,
@@ -253,4 +406,6 @@ module.exports = {
   generarDocxActaQa,
   buildTemplateData,
   renderDocxFromTemplate,
+  parseJsonMaybe,
+  safeText,
 };
