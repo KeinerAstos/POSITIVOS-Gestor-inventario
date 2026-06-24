@@ -75,24 +75,21 @@ function shouldRenderAsImageField(campo) {
   const label = String(campo?.label || '').toLowerCase();
   const type = String(campo?.type || '').toLowerCase();
 
+  // La forma correcta y prioritaria: el schema define type: 'image'
   if (['image', 'photo', 'foto', 'file'].includes(type)) return true;
 
+  // Compatibilidad con campos antiguos de evidencia/foto.
+  // OJO: no ponemos "firmados" aquí porque puede confundir un select SI/NO/N/A con imagen.
   return (
     key.startsWith('foto_') ||
     key.includes('_foto_') ||
-    key.includes('evidencia') ||
-    key.includes('pantallazo') ||
-    key.includes('fotografia') ||
-    key.includes('fotografico') ||
-    key.includes('firmados') ||
-    key.includes('escane') ||
+    key.includes('imagen_') ||
+    key.includes('_imagen') ||
+    key.includes('escaneo') ||
+    key.includes('evidencia_imagen') ||
     label.includes('foto') ||
-    label.includes('evidencia') ||
-    label.includes('pantallazo') ||
-    label.includes('fotografía') ||
-    label.includes('fotografico') ||
-    label.includes('firmados') ||
-    label.includes('escanear')
+    label.includes('imagen') ||
+    label.includes('escaneo')
   );
 }
 
@@ -146,6 +143,11 @@ function fileToResizedDataUrl(file, maxWidth = 1000, maxHeight = 800, quality = 
         canvas.height = height;
 
         const ctx = canvas.getContext('2d');
+
+        // Fondo blanco para evitar fondos negros/vinotinto cuando la imagen trae transparencia
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+
         ctx.drawImage(img, 0, 0, width, height);
 
         resolve(canvas.toDataURL('image/jpeg', quality));

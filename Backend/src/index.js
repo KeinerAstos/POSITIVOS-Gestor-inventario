@@ -10,7 +10,7 @@ const actasQaRoutes = require('./routes/actas-qa');
 
 // middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({limit: '15mb' }));
 
 const salidasRouter = require('./routes/salidas');
 app.use('/api/salidas', verifyToken, salidasRouter); // ✅ ahora verifyToken existe
