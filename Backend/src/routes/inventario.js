@@ -145,11 +145,11 @@ router.post('/asignar', async (req, res) => {
            FOR UPDATE`,
           [inventario_id]
         );
-        
+
         if (rows.length === 0) {
           throw new Error(`El material ID ${inventario_id} no es un consumible válido.`);
         }
-        
+
         const currentStock = rows[0];
         if (Number(currentStock.cantidad) < cantidadAsignar) {
           throw new Error(`Stock insuficiente para material ID ${inventario_id}. Disponibles: ${currentStock.cantidad}, solicitados: ${cantidadAsignar}`);
@@ -246,20 +246,16 @@ router.get('/', async (req, res) => {
     bodega_id,
     estado,
     material_id,
+    search,
     page = 1,
-    limit = 20,
-    search = ''
+    limit = 20
   } = req.query;
 
   const filtros = [];
   const valores = [];
 
-  const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
-  const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
-  const offset = (pageNumber - 1) * limitNumber;
-
   if (bodega_id) {
-    valores.push(bodega_id);
+    valores.push(Number(bodega_id));
     filtros.push(`i.bodega_id = $${valores.length}`);
   }
 
@@ -269,89 +265,118 @@ router.get('/', async (req, res) => {
   }
 
   if (material_id) {
-    valores.push(material_id);
-    filtros.push(`i.material_id = $${valores.length}`);
+    valores.push(String(material_id));
+    filtros.push(`CAST(i.material_id AS TEXT) = CAST($${valores.length} AS TEXT)`);
   }
 
-  if (search && search.trim() !== '') {
+  if (search && search.trim()) {
     valores.push(`%${search.trim()}%`);
-    const searchIndex = valores.length;
+    const idx = valores.length;
 
     filtros.push(`
       (
-        i.id::text ILIKE $${searchIndex}
-        OR i.material_id::text ILIKE $${searchIndex}
-        OR i.serie::text ILIKE $${searchIndex}
-        OR i.doc_material::text ILIKE $${searchIndex}
-        OR i.oth::text ILIKE $${searchIndex}
-        OR i.lote::text ILIKE $${searchIndex}
-        OR i.ubicacion::text ILIKE $${searchIndex}
-        OR i.estado::text ILIKE $${searchIndex}
-        OR m.descripcion::text ILIKE $${searchIndex}
-        OR b.nombre::text ILIKE $${searchIndex}
-        OR u.nombre::text ILIKE $${searchIndex}
-        OR ot.numero_ot::text ILIKE $${searchIndex}
+        CAST(i.id AS TEXT) ILIKE $${idx}
+        OR CAST(i.material_id AS TEXT) ILIKE $${idx}
+        OR COALESCE(m.descripcion, '') ILIKE $${idx}
+        OR COALESCE(i.serial, '') ILIKE $${idx}
+        OR COALESCE(CAST(i.documento_material AS TEXT), '') ILIKE $${idx}
+        OR COALESCE(i.oth, '') ILIKE $${idx}
+        OR COALESCE(i.lote, '') ILIKE $${idx}
+        OR COALESCE(i.ubicacion, '') ILIKE $${idx}
+        OR COALESCE(i.estado, '') ILIKE $${idx}
+        OR COALESCE(b.nombre, '') ILIKE $${idx}
+        OR COALESCE(o.numero_ot, '') ILIKE $${idx}
       )
     `);
   }
 
   const where = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
 
+  const pageNumber = Math.max(parseInt(page, 10) || 1, 1);
+  const limitNumber = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+  const offset = (pageNumber - 1) * limitNumber;
+
   try {
     const countQuery = `
       SELECT COUNT(*)::int AS total
       FROM inventario i
-      LEFT JOIN materiales m ON i.material_id = m.codigo_sap
-      LEFT JOIN bodegas b ON i.bodega_id = b.id
-      LEFT JOIN usuarios u ON i.usuario_asignado = u.id
-      LEFT JOIN ot ON i.ot_id = ot.id
+      LEFT JOIN materiales m 
+        ON CAST(m.codigo_sap AS TEXT) = CAST(i.material_id AS TEXT)
+      LEFT JOIN bodegas b 
+        ON b.id = i.bodega_id
+      LEFT JOIN ot o 
+        ON o.id = i.ot_id
       ${where}
     `;
 
+    const countResult = await pool.query(countQuery, valores);
+    const total = Number(countResult.rows[0]?.total || 0);
+    const totalPages = Math.max(Math.ceil(total / limitNumber), 1);
+
     const dataQuery = `
-      SELECT 
-        i.*,
+      SELECT
+        i.id,
+        i.material_id,
+        m.descripcion AS descripcion,
         m.descripcion AS material_descripcion,
+        i.serial,
+        i.cantidad,
+        i.ot_id,
+        i.usuario_asignado,
+        i.estado,
+        i.ubicacion,
+        i.created_at,
+        i.ot_consumo_id,
+        i.fecha_instalacion,
+        i.bodega_id,
+        i.updated_at,
+        i.documento_material,
+        i.oth,
+        i.lote,
         b.nombre AS bodega_nombre,
-        u.nombre AS usuario_asignado_nombre,
-        ot.numero_ot
+        o.numero_ot
       FROM inventario i
-      LEFT JOIN materiales m ON i.material_id = m.codigo_sap
-      LEFT JOIN bodegas b ON i.bodega_id = b.id
-      LEFT JOIN usuarios u ON i.usuario_asignado = u.id
-      LEFT JOIN ot ON i.ot_id = ot.id
+      LEFT JOIN materiales m 
+        ON CAST(m.codigo_sap AS TEXT) = CAST(i.material_id AS TEXT)
+      LEFT JOIN bodegas b 
+        ON b.id = i.bodega_id
+      LEFT JOIN ot o 
+        ON o.id = i.ot_id
       ${where}
       ORDER BY i.id DESC
       LIMIT $${valores.length + 1}
       OFFSET $${valores.length + 2}
     `;
 
-    const countResult = await pool.query(countQuery, valores);
     const dataResult = await pool.query(dataQuery, [
       ...valores,
       limitNumber,
       offset
     ]);
 
-    const total = countResult.rows[0]?.total || 0;
-    const totalPages = Math.ceil(total / limitNumber);
-
     res.json({
+      ok: true,
       data: dataResult.rows,
       pagination: {
         page: pageNumber,
         limit: limitNumber,
         total,
         totalPages,
-        hasNextPage: pageNumber < totalPages,
-        hasPreviousPage: pageNumber > 1
+        hasPreviousPage: pageNumber > 1,
+        hasNextPage: pageNumber < totalPages
       }
     });
-  } catch (err) {
-    console.error('Error en GET /inventario:', err);
-    res.status(500).json({ error: err.message });
+  } catch (error) {
+    console.error('Error en GET /inventario:', error);
+
+    res.status(500).json({
+      ok: false,
+      error: 'Error consultando inventario',
+      detail: error.message
+    });
   }
 });
+
 
 // POST /api/inventario - Ingreso simplificado (sin preguntar estado)
 router.post('/', async (req, res) => {
@@ -748,7 +773,7 @@ router.post('/devolver-bodega', async (req, res) => {
 
       } else {
         // ✅ Devolución parcial: restar del original y acumular en stock (o crear nuevo registro)
-        
+
         // Buscar registro de stock compatible (mismo material, bodega, sin serial, misma OT si conservar_ot)
         let stockQuery = `
           SELECT id, cantidad
@@ -984,7 +1009,7 @@ router.post('/test', (req, res) => {
   console.log('✅ Endpoint /test funcionando');
   res.json({ success: true, message: 'Endpoint funciona' });
 });
-module.exports = router;
+
 
 // POST /api/inventario/entregar-tecnico - Entregar equipo a técnico
 router.post('/entregar-tecnico', async (req, res) => {
@@ -1434,7 +1459,7 @@ router.get('/export', async (req, res) => {
   const valores = [];
 
   if (bodega_id) {
-    valores.push(bodega_id);
+    valores.push(Number(bodega_id));
     filtros.push(`i.bodega_id = $${valores.length}`);
   }
 
@@ -1444,8 +1469,8 @@ router.get('/export', async (req, res) => {
   }
 
   if (material_id) {
-    valores.push(material_id);
-    filtros.push(`i.material_id = $${valores.length}`);
+    valores.push(String(material_id));
+    filtros.push(`CAST(i.material_id AS TEXT) = CAST($${valores.length} AS TEXT)`);
   }
 
   if (search && search.trim() !== '') {
@@ -1454,18 +1479,18 @@ router.get('/export', async (req, res) => {
 
     filtros.push(`
       (
-        i.id::text ILIKE $${idx}
-        OR i.material_id::text ILIKE $${idx}
-        OR i.serial::text ILIKE $${idx}
-        OR i.documento_material::text ILIKE $${idx}
-        OR i.oth::text ILIKE $${idx}
-        OR i.lote::text ILIKE $${idx}
-        OR i.ubicacion::text ILIKE $${idx}
-        OR i.estado::text ILIKE $${idx}
-        OR m.descripcion::text ILIKE $${idx}
-        OR b.nombre::text ILIKE $${idx}
-        OR u.nombre::text ILIKE $${idx}
-        OR ot.numero_ot::text ILIKE $${idx}
+        CAST(i.id AS TEXT) ILIKE $${idx}
+        OR CAST(i.material_id AS TEXT) ILIKE $${idx}
+        OR COALESCE(i.serial, '') ILIKE $${idx}
+        OR COALESCE(CAST(i.documento_material AS TEXT), '') ILIKE $${idx}
+        OR COALESCE(i.oth, '') ILIKE $${idx}
+        OR COALESCE(i.lote, '') ILIKE $${idx}
+        OR COALESCE(i.ubicacion, '') ILIKE $${idx}
+        OR COALESCE(i.estado, '') ILIKE $${idx}
+        OR COALESCE(m.descripcion, '') ILIKE $${idx}
+        OR COALESCE(b.nombre, '') ILIKE $${idx}
+        OR COALESCE(u.nombre, '') ILIKE $${idx}
+        OR COALESCE(o.numero_ot, '') ILIKE $${idx}
       )
     `);
   }
@@ -1483,10 +1508,10 @@ router.get('/export', async (req, res) => {
       SELECT 
         i.cantidad,
         i.material_id,
-        COALESCE(m.descripcion, i.descripcion) AS descripcion,
+        m.descripcion AS descripcion,
         i.serial,
         i.documento_material,
-        ot.numero_ot,
+        o.numero_ot,
         i.oth,
         i.lote,
         i.ubicacion,
@@ -1494,10 +1519,14 @@ router.get('/export', async (req, res) => {
         i.estado,
         u.nombre AS usuario_asignado_nombre
       FROM inventario i
-      LEFT JOIN materiales m ON i.material_id = m.codigo_sap
-      LEFT JOIN bodegas b ON i.bodega_id = b.id
-      LEFT JOIN usuarios u ON i.usuario_asignado = u.id
-      LEFT JOIN ot ON i.ot_id = ot.id
+      LEFT JOIN materiales m 
+        ON CAST(i.material_id AS TEXT) = CAST(m.codigo_sap AS TEXT)
+      LEFT JOIN bodegas b 
+        ON i.bodega_id = b.id
+      LEFT JOIN usuarios u 
+        ON i.usuario_asignado = u.id
+      LEFT JOIN ot o 
+        ON i.ot_id = o.id
       ${where}
       ORDER BY i.id DESC
       `,
@@ -1548,6 +1577,12 @@ router.get('/export', async (req, res) => {
     res.send('\uFEFF' + csv);
   } catch (err) {
     console.error('Error en GET /inventario/export:', err);
-    res.status(500).json({ error: err.message });
+
+    res.status(500).json({
+      ok: false,
+      error: 'Error exportando inventario',
+      detail: err.message
+    });
   }
 });
+module.exports = router;

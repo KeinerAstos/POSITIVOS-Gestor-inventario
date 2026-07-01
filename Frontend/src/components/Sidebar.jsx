@@ -11,28 +11,35 @@ const normalizarRol = (valor = '') => {
 };
 
 const NAV_ITEMS = [
-  { id: 'dashboard',      icon: 'ti-dashboard',         label: 'Dashboard',          group: 'general',     roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
-  { id: 'inventario',     icon: 'ti-package',           label: 'Inventario',         group: 'general',     roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
-  { id: 'tecnico',        icon: 'ti-tool',              label: 'Mis Equipos',        group: 'general',     roles: ['TECNICO'] },
-  { id: 'control-calidad',icon: 'ti-shield-check',      label: 'Control de Calidad', group: 'general',     roles: ['CONTROL_CALIDAD'] },
-  { id: 'ot-dashboard',   icon: 'ti-file-invoice',      label: 'Dashboard OT',       group: 'operaciones', roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
-  { id: 'asignacion',     icon: 'ti-truck-delivery',    label: 'Entrega a Técnico',  group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
-  { id: 'devolucion',     icon: 'ti-rotate-clockwise-2',label: 'Devolución',          group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
-  { id: 'reasignacion-ot',icon: 'ti-switch-horizontal', label: 'Reasignar OT',       group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
-  { id: 'salidas',        icon: 'ti-truck',             label: 'Salidas',            group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
-  { id: 'movimientos',    icon: 'ti-history',           label: 'Movimientos',        group: 'reportes',    roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
-  { id: 'reasignaciones', icon: 'ti-arrows-exchange',   label: 'Historial Reasig.',  group: 'reportes',    roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
-  { id: 'bodegas',        icon: 'ti-building-warehouse',label: 'Bodegas',            group: 'config',      roles: ['ADMIN'] },
-  { id: 'ot',             icon: 'ti-clipboard-list',    label: 'Órdenes de Trabajo', group: 'config',      roles: ['ADMIN', 'BODEGA'] },
-  { id: 'carga-masiva',   icon: 'ti-upload',            label: 'Carga Masiva',       group: 'config',      roles: ['ADMIN'] },
-  { id: 'usuarios',       icon: 'ti-users',             label: 'Usuarios',           group: 'config',      roles: ['ADMIN'] }, // ← NUEVO
+  { id: 'dashboard', icon: 'ti-dashboard', label: 'Dashboard', group: 'general', roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
+  { id: 'inventario', icon: 'ti-package', label: 'Inventario', group: 'general', roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
+  { id: 'tecnico', icon: 'ti-tool', label: 'Mis Equipos', group: 'general', roles: ['TECNICO'] },
+  { id: 'control-calidad', icon: 'ti-shield-check', label: 'Control de Calidad', group: 'general', roles: ['CONTROL_CALIDAD'] },
+  { id: 'ot-dashboard', icon: 'ti-file-invoice', label: 'Dashboard OT', group: 'operaciones', roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
+  { id: 'asignacion', icon: 'ti-truck-delivery', label: 'Entrega a Técnico', group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
+  { id: 'devolucion', icon: 'ti-rotate-clockwise-2', label: 'Devolución', group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
+  {
+    id: 'consumo',
+    icon: 'ti-checkup-list',
+    label: 'Consumo',
+    group: 'operaciones',
+    roles: ['ADMIN', 'BODEGA']
+  },
+  { id: 'reasignacion-ot', icon: 'ti-switch-horizontal', label: 'Reasignar OT', group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
+  { id: 'salidas', icon: 'ti-truck', label: 'Salidas', group: 'operaciones', roles: ['ADMIN', 'BODEGA'] },
+  { id: 'movimientos', icon: 'ti-history', label: 'Movimientos', group: 'reportes', roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
+  { id: 'reasignaciones', icon: 'ti-arrows-exchange', label: 'Historial Reasig.', group: 'reportes', roles: ['ADMIN', 'BODEGA', 'SUPERVISOR'] },
+  { id: 'bodegas', icon: 'ti-building-warehouse', label: 'Bodegas', group: 'config', roles: ['ADMIN'] },
+  { id: 'ot', icon: 'ti-clipboard-list', label: 'Órdenes de Trabajo', group: 'config', roles: ['ADMIN', 'BODEGA'] },
+  { id: 'carga-masiva', icon: 'ti-upload', label: 'Carga Masiva', group: 'config', roles: ['ADMIN'] },
+  { id: 'usuarios', icon: 'ti-users', label: 'Usuarios', group: 'config', roles: ['ADMIN'] }, // ← NUEVO
 ];
 
 const GROUPS = {
-  general:     'General',
+  general: 'General',
   operaciones: 'Operaciones',
-  reportes:    'Reportes',
-  config:      'Configuración',
+  reportes: 'Reportes',
+  config: 'Configuración',
 };
 
 export default function Sidebar({ view, setView, user, onLogout, collapsed, setCollapsed }) {

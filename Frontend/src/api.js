@@ -9,11 +9,11 @@ export const ESTADOS = {
 };
 
 export const ESTADO_META = {
-  STOCK:     { label: 'Stock',      color: '#22C55E', bg: 'rgba(34,197,94,0.12)',   icon: 'ti-building-warehouse' },
-  INGRESADO: { label: 'Ingresado',  color: '#F97316', bg: 'rgba(249,115,22,0.12)',  icon: 'ti-file-invoice' },
-  TERRENO:   { label: 'En Terreno', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  icon: 'ti-truck-delivery' },
-  CONSUMO:   { label: 'Consumido',  color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ti-check' },
-  DEVUELTO:  { label: 'Devuelto',   color: '#14B8A6', bg: 'rgba(20,184,166,0.12)',  icon: 'ti-rotate-clockwise-2' },
+  STOCK: { label: 'Stock', color: '#22C55E', bg: 'rgba(34,197,94,0.12)', icon: 'ti-building-warehouse' },
+  INGRESADO: { label: 'Ingresado', color: '#F97316', bg: 'rgba(249,115,22,0.12)', icon: 'ti-file-invoice' },
+  TERRENO: { label: 'En Terreno', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', icon: 'ti-truck-delivery' },
+  CONSUMO: { label: 'Consumido', color: '#94A3B8', bg: 'rgba(148,163,184,0.12)', icon: 'ti-check' },
+  DEVUELTO: { label: 'Devuelto', color: '#14B8A6', bg: 'rgba(20,184,166,0.12)', icon: 'ti-rotate-clockwise-2' },
 };
 
 export const http = {
@@ -50,6 +50,13 @@ export const http = {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
+
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        throw new Error('Sesión vencida. Vuelve a iniciar sesión.');
+      }
+
       throw new Error(err.error || 'Error de servidor');
     }
     return res.json();
@@ -58,12 +65,12 @@ export const http = {
 
 export const fmtFecha = (f) => {
   if (!f) return '—';
-  try { return new Date(f).toLocaleDateString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric' }); }
+  try { return new Date(f).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
   catch { return '—'; }
 };
 
 export const fmtFechaHora = (f) => {
   if (!f) return '—';
-  try { return new Date(f).toLocaleString('es-CO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+  try { return new Date(f).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
   catch { return '—'; }
 };

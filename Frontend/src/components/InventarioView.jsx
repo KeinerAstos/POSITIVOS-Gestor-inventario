@@ -1,6 +1,18 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { http, fmtFecha, ESTADO_META } from '../api.js';
-import { Card, CardHeader, Btn, Alert, Badge, Label, PageHeader, SearchInput, EmptyState, Loading, DropdownList } from './UI.jsx';
+import {
+  Card,
+  CardHeader,
+  Btn,
+  Alert,
+  Badge,
+  Label,
+  PageHeader,
+  SearchInput,
+  EmptyState,
+  Loading,
+  DropdownList
+} from './UI.jsx';
 import '../styles/InventarioView.css';
 
 export default function InventarioView({ bodegas = [], materiales = [], ots = [], refresh }) {
@@ -18,31 +30,30 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
+
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
     total: 0,
-    totalPages: 1,
-    hasNextPage: false,
-    hasPreviousPage: false
+    totalPages: 1
   });
 
-  // Estados para exportación por estado
   const [reporteEstado, setReporteEstado] = useState('');
 
-  // Modal de movimientos
   const [showMovementsModal, setShowMovementsModal] = useState(false);
   const [selectedItemMovements, setSelectedItemMovements] = useState([]);
   const [loadingMovements, setLoadingMovements] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
 
-  // OT search y creación
   const [buscarOT, setBuscarOT] = useState('');
   const [showOtDrop, setShowOtDrop] = useState(false);
   const [otSel, setOtSel] = useState(null);
-  const [nuevaOTData, setNuevaOTData] = useState({ cliente: '', destino: '', mostrarFormulario: false });
+  const [nuevaOTData, setNuevaOTData] = useState({
+    cliente: '',
+    destino: '',
+    mostrarFormulario: false
+  });
 
-  // Material search
   const [buscarMat, setBuscarMat] = useState('');
   const [showMatDrop, setShowMatDrop] = useState(false);
   const [matSel, setMatSel] = useState(null);
@@ -61,6 +72,130 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
   const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
 
+  const normalizarRespuestaInventario = (response) => {
+    let payload = response;
+
+    /*
+      Caso 1:
+      Tu helper http.get ya devuelve directamente:
+      {
+        ok: true,
+        data: [...],
+        pagination: {...}
+      }
+  
+      En este caso NO debemos hacer payload = response.data,
+      porque perderíamos pagination.
+    */
+    if (
+      response &&
+      !Array.isArray(response) &&
+      Array.isArray(response.data) &&
+      response.pagination
+    ) {
+      const data = response.data;
+      const p = response.pagination;
+
+      const currentPage = Number(p.page || page || 1);
+      const currentLimit = Number(p.limit || limit || 20);
+      const total = Number(p.total || 0);
+      const totalPages = Math.max(Number(p.totalPages || Math.ceil(total / currentLimit) || 1), 1);
+
+      return {
+        data,
+        pagination: {
+          page: currentPage,
+          limit: currentLimit,
+          total,
+          totalPages,
+          hasPreviousPage: Boolean(p.hasPreviousPage ?? currentPage > 1),
+          hasNextPage: Boolean(p.hasNextPage ?? currentPage < totalPages)
+        }
+      };
+    }
+
+    /*
+      Caso 2:
+      Axios puro:
+      response.data = {
+        ok: true,
+        data: [...],
+        pagination: {...}
+      }
+    */
+    if (
+      response?.data &&
+      !Array.isArray(response.data) &&
+      Array.isArray(response.data.data)
+    ) {
+      payload = response.data;
+
+      const data = payload.data;
+      const p = payload.pagination || {};
+
+      const currentPage = Number(p.page || page || 1);
+      const currentLimit = Number(p.limit || limit || 20);
+      const total = Number(p.total || 0);
+      const totalPages = Math.max(Number(p.totalPages || Math.ceil(total / currentLimit) || 1), 1);
+
+      return {
+        data,
+        pagination: {
+          page: currentPage,
+          limit: currentLimit,
+          total,
+          totalPages,
+          hasPreviousPage: Boolean(p.hasPreviousPage ?? currentPage > 1),
+          hasNextPage: Boolean(p.hasNextPage ?? currentPage < totalPages)
+        }
+      };
+    }
+
+    /*
+      Caso 3:
+      Backend viejo que devuelve solo un array.
+    */
+    if (Array.isArray(response)) {
+      return {
+        data: response,
+        pagination: {
+          page: 1,
+          limit: response.length,
+          total: response.length,
+          totalPages: 1,
+          hasPreviousPage: false,
+          hasNextPage: false
+        }
+      };
+    }
+
+    if (Array.isArray(response?.data)) {
+      return {
+        data: response.data,
+        pagination: {
+          page: 1,
+          limit: response.data.length,
+          total: response.data.length,
+          totalPages: 1,
+          hasPreviousPage: false,
+          hasNextPage: false
+        }
+      };
+    }
+
+    return {
+      data: [],
+      pagination: {
+        page,
+        limit,
+        total: 0,
+        totalPages: 1,
+        hasPreviousPage: false,
+        hasNextPage: false
+      }
+    };
+  };
+
   const cargarInventario = useCallback(async () => {
     setLoadingInventario(true);
 
@@ -76,94 +211,25 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
       const response = await http.get(`/inventario?${params.toString()}`);
 
-      console.log('RESPUESTA INVENTARIO COMPLETA:', response);
+      const resultado = normalizarRespuestaInventario(response);
 
-      /*
-        Soporta varias formas posibles de respuesta:
-  
-        1. Axios normal:
-           response.data = { data: [...], pagination: {...} }
-  
-        2. Wrapper personalizado:
-           response = { data: [...], pagination: {...} }
-  
-        3. Backend viejo:
-           response.data = [...]
-           o response = [...]
-      */
+      setItems(resultado.data);
+      setPagination(resultado.pagination);
+    } catch (err) {
+      console.error('Error cargando inventario:', err);
 
-      let payload = response;
-
-      if (response?.data && !Array.isArray(response)) {
-        payload = response.data;
-      }
-
-      console.log('PAYLOAD INVENTARIO:', payload);
-
-      // Caso backend nuevo: { data: [...], pagination: {...} }
-      if (payload && Array.isArray(payload.data)) {
-        setItems(payload.data);
-
-        setPagination(payload.pagination || {
-          page,
-          limit,
-          total: payload.data.length,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPreviousPage: false
-        });
-
-        return;
-      }
-
-      // Caso backend viejo: [...]
-      if (Array.isArray(payload)) {
-        setItems(payload);
-
-        setPagination({
-          page: 1,
-          limit: payload.length,
-          total: payload.length,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPreviousPage: false
-        });
-
-        return;
-      }
-
-      // Caso extraño: response.data.data
-      if (response?.data?.data && Array.isArray(response.data.data)) {
-        setItems(response.data.data);
-
-        setPagination(response.data.pagination || {
-          page,
-          limit,
-          total: response.data.data.length,
-          totalPages: 1,
-          hasNextPage: false,
-          hasPreviousPage: false
-        });
-
-        return;
-      }
-
-      console.warn('Formato de respuesta no reconocido:', response);
+      setAlert({
+        type: 'error',
+        msg: 'No se pudo cargar el inventario.'
+      });
 
       setItems([]);
       setPagination({
         page,
         limit,
         total: 0,
-        totalPages: 1,
-        hasNextPage: false,
-        hasPreviousPage: false
+        totalPages: 1
       });
-
-    } catch (err) {
-      console.error('Error cargando inventario:', err);
-      setAlert({ type: 'error', msg: 'No se pudo cargar el inventario.' });
-      setItems([]);
     } finally {
       setLoadingInventario(false);
     }
@@ -186,10 +252,11 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
     setPage(1);
   };
 
-  // Filtros para dropdowns
   const filteredOTs = useMemo(() => {
     if (!buscarOT.trim()) return [];
+
     const t = buscarOT.toLowerCase();
+
     return ots
       .filter(o =>
         (o.numero_ot || '').toLowerCase().includes(t) ||
@@ -200,7 +267,9 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
   const filteredMats = useMemo(() => {
     if (!buscarMat.trim()) return [];
+
     const t = buscarMat.toLowerCase();
+
     return materiales
       .filter(m =>
         (m.codigo_sap || '').toLowerCase().includes(t) ||
@@ -212,7 +281,20 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
   const getBodega = id => bodegas.find(b => b.id === id)?.nombre || '—';
 
   const buildCsv = (datos) => {
-    const headers = ['Material', 'Código', 'Serie', 'Doc. Material', 'OTH', 'Lote', 'Cantidad', 'Ubicación', 'Bodega', 'Estado', 'OT Asociada'];
+    const headers = [
+      'Material',
+      'Código',
+      'Serie',
+      'Doc. Material',
+      'OTH',
+      'Lote',
+      'Cantidad',
+      'Ubicación',
+      'Bodega',
+      'Estado',
+      'OT Asociada'
+    ];
+
     const rows = datos.map(i => [
       i.descripcion || i.material_descripcion || '',
       i.material_id || '',
@@ -232,25 +314,29 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
       .join('\n');
   };
 
-  // Exporta solo lo que está visible en la página actual
   const exportarFiltrado = () => {
     if (!items.length) {
-      setAlert({ type: 'error', msg: 'No hay equipos para exportar en la página actual.' });
+      setAlert({
+        type: 'error',
+        msg: 'No hay equipos para exportar en la página actual.'
+      });
       return;
     }
 
     const csv = buildCsv(items);
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], {
+      type: 'text/csv;charset=utf-8;'
+    });
+
     const link = document.createElement('a');
 
     link.href = URL.createObjectURL(blob);
-    link.download = `inventario_pagina_${page}_${new Date().toISOString().slice(0, 19)}.csv`;
+    link.download = `inventario_pagina_${pagination.page}_${new Date().toISOString().slice(0, 19)}.csv`;
     link.click();
 
     URL.revokeObjectURL(link.href);
   };
 
-  // Exporta por estado usando backend. Recomendado para no cargar toda la BD en React.
   const exportarPorEstado = () => {
     const params = new URLSearchParams();
 
@@ -266,10 +352,27 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
     try {
       const response = await http.get(`/movimientos?inventario_id=${inventarioId}&limit=50`);
-      setSelectedItemMovements(response.data || []);
+
+      let payload = response;
+
+      if (response?.data && !Array.isArray(response)) {
+        payload = response.data;
+      }
+
+      if (payload?.data && Array.isArray(payload.data)) {
+        setSelectedItemMovements(payload.data);
+      } else if (Array.isArray(payload)) {
+        setSelectedItemMovements(payload);
+      } else {
+        setSelectedItemMovements([]);
+      }
     } catch (err) {
       console.error(err);
-      setAlert({ type: 'error', msg: 'No se pudieron cargar los movimientos' });
+
+      setAlert({
+        type: 'error',
+        msg: 'No se pudieron cargar los movimientos'
+      });
     } finally {
       setLoadingMovements(false);
     }
@@ -279,81 +382,6 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
     setCurrentItem(item);
     loadMovements(item.id);
     setShowMovementsModal(true);
-  };
-
-  const handleCreate = async () => {
-    if (!form.material_id) {
-      setAlert({ type: 'error', msg: 'Debes seleccionar un material.' });
-      return;
-    }
-
-    if (!form.bodega_id) {
-      setAlert({ type: 'error', msg: 'Debes seleccionar una bodega.' });
-      return;
-    }
-
-    setSaving(true);
-    setAlert(null);
-
-    try {
-      let otId = form.ot_id;
-
-      if (buscarOT && buscarOT.trim() !== '') {
-        const otExistente = ots.find(o => o.numero_ot === buscarOT);
-
-        if (otExistente) {
-          otId = otExistente.id;
-          setOtSel(otExistente);
-          setForm(p => ({ ...p, ot_id: otId }));
-        } else {
-          if (!nuevaOTData.cliente) {
-            setAlert({ type: 'error', msg: 'La OT no existe. Debes ingresar el cliente para crearla.' });
-            setSaving(false);
-            return;
-          }
-
-          const nuevaOT = await http.post('/ot', {
-            numero_ot: buscarOT,
-            cliente: nuevaOTData.cliente,
-            destino: nuevaOTData.destino || 'Pendiente',
-            estado: 'ABIERTA'
-          });
-
-          otId = nuevaOT.id;
-          setOtSel(nuevaOT);
-          setForm(p => ({ ...p, ot_id: otId }));
-
-          if (refresh) await refresh();
-        }
-      }
-
-      const payload = {
-        material_id: form.material_id,
-        serial: form.serial?.trim() || null,
-        cantidad: parseInt(form.cantidad) || 1,
-        bodega_id: parseInt(form.bodega_id),
-        ubicacion: form.ubicacion || null,
-        ot_id: otId || null,
-        documento_material: form.documento_material || null,
-        oth: form.oth || null,
-        lote: form.lote || 'NO VALORADO'
-      };
-
-      await http.post('/inventario', payload);
-
-      resetForm();
-      setShowForm(false);
-      setPage(1);
-      await cargarInventario();
-
-      if (refresh) await refresh();
-
-      setAlert({ type: 'success', msg: 'Equipo registrado correctamente.' });
-    } catch (err) {
-      setAlert({ type: 'error', msg: err.message });
-    } finally {
-      setSaving(false);
-    }
   };
 
   const resetForm = () => {
@@ -373,14 +401,117 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
     setOtSel(null);
     setBuscarMat('');
     setMatSel(null);
-    setNuevaOTData({ cliente: '', destino: '', mostrarFormulario: false });
+    setNuevaOTData({
+      cliente: '',
+      destino: '',
+      mostrarFormulario: false
+    });
+  };
+
+  const handleCreate = async () => {
+    if (!form.material_id) {
+      setAlert({
+        type: 'error',
+        msg: 'Debes seleccionar un material.'
+      });
+      return;
+    }
+
+    if (!form.bodega_id) {
+      setAlert({
+        type: 'error',
+        msg: 'Debes seleccionar una bodega.'
+      });
+      return;
+    }
+
+    setSaving(true);
+    setAlert(null);
+
+    try {
+      let otId = form.ot_id;
+
+      if (buscarOT && buscarOT.trim() !== '') {
+        const otExistente = ots.find(o => o.numero_ot === buscarOT);
+
+        if (otExistente) {
+          otId = otExistente.id;
+          setOtSel(otExistente);
+          setForm(p => ({ ...p, ot_id: otId }));
+        } else {
+          if (!nuevaOTData.cliente) {
+            setAlert({
+              type: 'error',
+              msg: 'La OT no existe. Debes ingresar el cliente para crearla.'
+            });
+
+            setSaving(false);
+            return;
+          }
+
+          const nuevaOT = await http.post('/ot', {
+            numero_ot: buscarOT,
+            cliente: nuevaOTData.cliente,
+            destino: nuevaOTData.destino || 'Pendiente',
+            estado: 'ABIERTA'
+          });
+
+          otId = nuevaOT?.id || nuevaOT?.data?.id;
+
+          setOtSel(nuevaOT?.data || nuevaOT);
+          setForm(p => ({ ...p, ot_id: otId }));
+
+          if (refresh) await refresh();
+        }
+      }
+
+      const payload = {
+        material_id: form.material_id,
+        serial: form.serial?.trim() || null,
+        cantidad: parseInt(form.cantidad, 10) || 1,
+        bodega_id: parseInt(form.bodega_id, 10),
+        ubicacion: form.ubicacion || null,
+        ot_id: otId || null,
+        documento_material: form.documento_material || null,
+        oth: form.oth || null,
+        lote: form.lote || 'NO VALORADO'
+      };
+
+      await http.post('/inventario', payload);
+
+      resetForm();
+      setShowForm(false);
+      setPage(1);
+
+      await cargarInventario();
+
+      if (refresh) await refresh();
+
+      setAlert({
+        type: 'success',
+        msg: 'Equipo registrado correctamente.'
+      });
+    } catch (err) {
+      console.error(err);
+
+      setAlert({
+        type: 'error',
+        msg: err.message || 'No se pudo registrar el equipo.'
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const clearOT = () => {
     setOtSel(null);
     setBuscarOT('');
     setForm(p => ({ ...p, ot_id: '' }));
-    setNuevaOTData({ cliente: '', destino: '', mostrarFormulario: false });
+    setNuevaOTData({
+      cliente: '',
+      destino: '',
+      mostrarFormulario: false
+    });
   };
 
   const selectOT = (ot) => {
@@ -388,7 +519,11 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
     setBuscarOT(ot.numero_ot);
     setForm(p => ({ ...p, ot_id: ot.id }));
     setShowOtDrop(false);
-    setNuevaOTData({ cliente: '', destino: '', mostrarFormulario: false });
+    setNuevaOTData({
+      cliente: '',
+      destino: '',
+      mostrarFormulario: false
+    });
   };
 
   const selectMaterial = (m) => {
@@ -404,40 +539,88 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
     setForm(p => ({ ...p, material_id: '' }));
   };
 
+  const irPaginaAnterior = () => {
+    if (loadingInventario) return;
+
+    setPage(prev => Math.max(prev - 1, 1));
+  };
+
+  const irPaginaSiguiente = () => {
+    if (loadingInventario) return;
+
+    setPage(prev => Math.min(prev + 1, pagination.totalPages || 1));
+  };
+
   const totalConSerialPagina = items.filter(i => i.serial).length;
   const totalSinSerialPagina = items.filter(i => !i.serial).length;
+
+  const paginaActual = Number(pagination.page || page || 1);
+  const totalPages = Math.max(Number(pagination.totalPages || 1), 1);
+  const totalRegistros = Number(pagination.total || 0);
+
+  const puedeAnterior = paginaActual > 1 && !loadingInventario;
+  const puedeSiguiente = paginaActual < totalPages && !loadingInventario;
 
   return (
     <div className="fade-in">
       <PageHeader
         title="Inventario"
         icon="ti-package"
-        subtitle={`${items.length} visibles de ${pagination.total} equipos · ${totalConSerialPagina} con serial en página · ${totalSinSerialPagina} sin serial en página`}
+        subtitle={`${items.length} visibles de ${totalRegistros} equipos · ${totalConSerialPagina} con serial en página · ${totalSinSerialPagina} sin serial en página`}
         actions={
           <div className="inventario-actions">
-            <select className="inventario-export-select" value={reporteEstado} onChange={e => setReporteEstado(e.target.value)}>
+            <select
+              className="inventario-export-select"
+              value={reporteEstado}
+              onChange={e => setReporteEstado(e.target.value)}
+            >
               <option value="">Todos los estados</option>
               {Object.keys(ESTADO_META).map(k => (
-                <option key={k} value={k}>{ESTADO_META[k].label}</option>
+                <option key={k} value={k}>
+                  {ESTADO_META[k].label}
+                </option>
               ))}
             </select>
 
-            <Btn variant="ghost" size="sm" onClick={exportarFiltrado} icon="ti-download">
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={exportarFiltrado}
+              icon="ti-download"
+            >
               Exportar página
             </Btn>
 
-            <Btn variant="ghost" size="sm" onClick={exportarPorEstado} icon="ti-download">
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={exportarPorEstado}
+              icon="ti-download"
+            >
               Exportar por estado
             </Btn>
 
-            <Btn size="sm" onClick={() => { setShowForm(s => !s); if (showForm) resetForm(); }} icon={showForm ? 'ti-x' : 'ti-plus'}>
+            <Btn
+              size="sm"
+              onClick={() => {
+                setShowForm(s => !s);
+                if (showForm) resetForm();
+              }}
+              icon={showForm ? 'ti-x' : 'ti-plus'}
+            >
               {showForm ? 'Cancelar' : 'Nuevo equipo'}
             </Btn>
           </div>
         }
       />
 
-      {alert && <Alert type={alert.type} msg={alert.msg} onClose={() => setAlert(null)} />}
+      {alert && (
+        <Alert
+          type={alert.type}
+          msg={alert.msg}
+          onClose={() => setAlert(null)}
+        />
+      )}
 
       {showForm && (
         <Card className="inventario-form fade-in">
@@ -461,10 +644,22 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                     onFocus={() => setShowMatDrop(true)}
                   />
 
-                  {buscarMat && <button className="inventario-clear-btn" onClick={clearMaterial}>×</button>}
+                  {buscarMat && (
+                    <button
+                      type="button"
+                      className="inventario-clear-btn"
+                      onClick={clearMaterial}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
 
-                {matSel && <div className="inventario-selected-badge">✓ {matSel.codigo_sap} — {matSel.descripcion}</div>}
+                {matSel && (
+                  <div className="inventario-selected-badge">
+                    ✓ {matSel.codigo_sap} — {matSel.descripcion}
+                  </div>
+                )}
 
                 <DropdownList
                   items={showMatDrop ? filteredMats : []}
@@ -472,7 +667,9 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                   renderItem={m => (
                     <>
                       <strong>{m.codigo_sap}</strong>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{m.descripcion}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {m.descripcion}
+                      </div>
                     </>
                   )}
                 />
@@ -480,19 +677,32 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
               <div>
                 <Label>N° Serie</Label>
-                <input value={form.serial} onChange={f('serial')} placeholder="Número de serie (opcional)" />
+                <input
+                  value={form.serial}
+                  onChange={f('serial')}
+                  placeholder="Número de serie (opcional)"
+                />
               </div>
 
               <div>
                 <Label required>Cantidad</Label>
-                <input type="number" min="1" value={form.cantidad} onChange={f('cantidad')} />
+                <input
+                  type="number"
+                  min="1"
+                  value={form.cantidad}
+                  onChange={f('cantidad')}
+                />
               </div>
 
               <div>
                 <Label required>Bodega destino</Label>
                 <select value={form.bodega_id} onChange={f('bodega_id')}>
                   <option value="">Seleccionar...</option>
-                  {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+                  {bodegas.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.nombre}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -504,6 +714,7 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                     value={buscarOT}
                     onChange={e => {
                       const val = e.target.value;
+
                       setBuscarOT(val);
                       setShowOtDrop(true);
 
@@ -513,16 +724,32 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                       }
 
                       const existe = ots.some(o => o.numero_ot === val);
-                      setNuevaOTData(prev => ({ ...prev, mostrarFormulario: val.length > 2 && !existe }));
+
+                      setNuevaOTData(prev => ({
+                        ...prev,
+                        mostrarFormulario: val.length > 2 && !existe
+                      }));
                     }}
                     placeholder="Número de OT..."
                     onFocus={() => setShowOtDrop(true)}
                   />
 
-                  {buscarOT && <button className="inventario-clear-btn" onClick={clearOT}>×</button>}
+                  {buscarOT && (
+                    <button
+                      type="button"
+                      className="inventario-clear-btn"
+                      onClick={clearOT}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
 
-                {otSel && <div className="inventario-selected-badge">✓ {otSel.numero_ot} — {otSel.cliente}</div>}
+                {otSel && (
+                  <div className="inventario-selected-badge">
+                    ✓ {otSel.numero_ot} — {otSel.cliente}
+                  </div>
+                )}
 
                 <DropdownList
                   items={showOtDrop ? filteredOTs : []}
@@ -538,12 +765,20 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
               <div>
                 <Label>OTH</Label>
-                <input value={form.oth} onChange={f('oth')} placeholder="Número OTH" />
+                <input
+                  value={form.oth}
+                  onChange={f('oth')}
+                  placeholder="Número OTH"
+                />
               </div>
 
               <div>
                 <Label>Doc. Material</Label>
-                <input value={form.documento_material} onChange={f('documento_material')} placeholder="Nro. documento SAP" />
+                <input
+                  value={form.documento_material}
+                  onChange={f('documento_material')}
+                  placeholder="Nro. documento SAP"
+                />
               </div>
 
               <div>
@@ -556,20 +791,31 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
               <div>
                 <Label>Ubicación</Label>
-                <input value={form.ubicacion} onChange={f('ubicacion')} placeholder="Rack, posición..." />
+                <input
+                  value={form.ubicacion}
+                  onChange={f('ubicacion')}
+                  placeholder="Rack, posición..."
+                />
               </div>
             </div>
 
             {nuevaOTData.mostrarFormulario && (
               <div className="inventario-nueva-ot">
-                <div className="inventario-nueva-ot-title">✨ Nueva OT — completar datos</div>
+                <div className="inventario-nueva-ot-title">
+                  ✨ Nueva OT — completar datos
+                </div>
 
                 <div className="inventario-nueva-ot-grid">
                   <div>
                     <Label required>Cliente</Label>
                     <input
                       value={nuevaOTData.cliente}
-                      onChange={e => setNuevaOTData(p => ({ ...p, cliente: e.target.value }))}
+                      onChange={e =>
+                        setNuevaOTData(p => ({
+                          ...p,
+                          cliente: e.target.value
+                        }))
+                      }
                       placeholder="Nombre cliente"
                     />
                   </div>
@@ -578,7 +824,12 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                     <Label>Destino</Label>
                     <input
                       value={nuevaOTData.destino}
-                      onChange={e => setNuevaOTData(p => ({ ...p, destino: e.target.value }))}
+                      onChange={e =>
+                        setNuevaOTData(p => ({
+                          ...p,
+                          destino: e.target.value
+                        }))
+                      }
                       placeholder="Dirección"
                     />
                   </div>
@@ -591,8 +842,19 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
             )}
 
             <div className="inventario-form-buttons">
-              <Btn onClick={handleCreate} loading={saving} icon="ti-check">Registrar equipo</Btn>
-              <Btn variant="secondary" onClick={() => { setShowForm(false); resetForm(); }}>Cancelar</Btn>
+              <Btn onClick={handleCreate} loading={saving} icon="ti-check">
+                Registrar equipo
+              </Btn>
+
+              <Btn
+                variant="secondary"
+                onClick={() => {
+                  setShowForm(false);
+                  resetForm();
+                }}
+              >
+                Cancelar
+              </Btn>
             </div>
           </div>
         </Card>
@@ -610,7 +872,12 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
             placeholder="Buscar por cualquier campo..."
           />
 
-          <Btn variant="secondary" size="sm" onClick={handleBuscar} icon="ti-search">
+          <Btn
+            variant="secondary"
+            size="sm"
+            onClick={handleBuscar}
+            icon="ti-search"
+          >
             Buscar
           </Btn>
 
@@ -623,7 +890,11 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
             }}
           >
             <option value="">Todas las bodegas</option>
-            {bodegas.map(b => <option key={b.id} value={b.id}>{b.nombre}</option>)}
+            {bodegas.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
+            ))}
           </select>
 
           <select
@@ -636,12 +907,19 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
           >
             <option value="">Todos los estados</option>
             {Object.entries(ESTADO_META).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
+              <option key={k} value={k}>
+                {v.label}
+              </option>
             ))}
           </select>
 
           {(filterBodega || filterEstado || search || searchDraft) && (
-            <Btn variant="ghost" size="sm" onClick={limpiarFiltros} icon="ti-x">
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={limpiarFiltros}
+              icon="ti-x"
+            >
               Limpiar
             </Btn>
           )}
@@ -652,7 +930,11 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
         {loadingInventario ? (
           <Loading text="Cargando inventario..." />
         ) : items.length === 0 ? (
-          <EmptyState icon="ti-package-off" title="Sin equipos" subtitle="No hay equipos que coincidan con los filtros" />
+          <EmptyState
+            icon="ti-package-off"
+            title="Sin equipos"
+            subtitle="No hay equipos que coincidan con los filtros"
+          />
         ) : (
           <>
             <div className="inventario-table-container">
@@ -676,37 +958,57 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                 <tbody>
                   {items.map(item => (
                     <tr key={item.id}>
-                      <td className="cantidad-cell">{item.cantidad ?? 1}</td>
-
-                      <td>
-                        <span className="inventario-codigo">{item.material_id}</span>
+                      <td className="cantidad-cell">
+                        {item.cantidad ?? 1}
                       </td>
 
-                      <td>{item.descripcion || item.material_descripcion || '—'}</td>
-
                       <td>
-                        {item.serial
-                          ? <code className="inventario-serial">{item.serial}</code>
-                          : <span className="inventario-sin-serial">—</span>
-                        }
+                        <span className="inventario-codigo">
+                          {item.material_id || item.codigo || '—'}
+                        </span>
                       </td>
 
-                      <td>{item.documento_material || '—'}</td>
+                      <td>
+                        {item.descripcion || item.material_descripcion || '—'}
+                      </td>
 
                       <td>
-                        {item.numero_ot
-                          ? <Badge v="info" style={{ background: 'none' }}>{item.numero_ot}</Badge>
-                          : '—'
-                        }
+                        {item.serial ? (
+                          <code className="inventario-serial">
+                            {item.serial}
+                          </code>
+                        ) : (
+                          <span className="inventario-sin-serial">—</span>
+                        )}
+                      </td>
+
+                      <td>{item.documento_material || item.doc_material || '—'}</td>
+
+                      <td>
+                        {item.numero_ot ? (
+                          <Badge v="info" style={{ background: 'none' }}>
+                            {item.numero_ot}
+                          </Badge>
+                        ) : (
+                          '—'
+                        )}
                       </td>
 
                       <td>{item.oth || '—'}</td>
                       <td>{item.lote || '—'}</td>
-                      <td>{item.ubicacion || '—'}</td>
-                      <td><Badge v={item.estado} /></td>
+                      <td>{item.ubicacion || item.bodega_nombre || '—'}</td>
 
                       <td>
-                        <Btn variant="secondary" size="sm" onClick={() => handleShowMovements(item)} icon="ti-history">
+                        <Badge v={item.estado} />
+                      </td>
+
+                      <td>
+                        <Btn
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleShowMovements(item)}
+                          icon="ti-history"
+                        >
                           Historial
                         </Btn>
                       </td>
@@ -718,12 +1020,13 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
 
             <div className="inventario-pagination">
               <div className="inventario-pagination-info">
-                Página {pagination.page} de {pagination.totalPages || 1} · Total: {pagination.total}
+                Página {paginaActual} de {totalPages} · Total: {totalRegistros}
               </div>
 
               <div className="inventario-pagination-actions">
                 <select
                   value={limit}
+                  disabled={loadingInventario}
                   onChange={e => {
                     setLimit(Number(e.target.value));
                     setPage(1);
@@ -738,8 +1041,8 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                 <Btn
                   variant="secondary"
                   size="sm"
-                  disabled={!pagination.hasPreviousPage}
-                  onClick={() => setPage(p => Math.max(p - 1, 1))}
+                  disabled={!puedeAnterior}
+                  onClick={irPaginaAnterior}
                   icon="ti-chevron-left"
                 >
                   Anterior
@@ -748,8 +1051,8 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
                 <Btn
                   variant="secondary"
                   size="sm"
-                  disabled={!pagination.hasNextPage}
-                  onClick={() => setPage(p => p + 1)}
+                  disabled={!puedeSiguiente}
+                  onClick={irPaginaSiguiente}
                   icon="ti-chevron-right"
                 >
                   Siguiente
@@ -761,22 +1064,38 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
       </Card>
 
       {showMovementsModal && currentItem && (
-        <div className="inventario-modal-overlay" onClick={() => setShowMovementsModal(false)}>
-          <div className="inventario-modal-content" onClick={e => e.stopPropagation()}>
+        <div
+          className="inventario-modal-overlay"
+          onClick={() => setShowMovementsModal(false)}
+        >
+          <div
+            className="inventario-modal-content"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="inventario-modal-header">
               <h3>
                 Movimientos de {currentItem.descripcion || currentItem.material_id}
                 {currentItem.serial && ` - Serial: ${currentItem.serial}`}
               </h3>
 
-              <button className="inventario-modal-close" onClick={() => setShowMovementsModal(false)}>×</button>
+              <button
+                type="button"
+                className="inventario-modal-close"
+                onClick={() => setShowMovementsModal(false)}
+              >
+                ×
+              </button>
             </div>
 
             <div className="inventario-modal-body">
               {loadingMovements ? (
                 <Loading text="Cargando movimientos..." />
               ) : selectedItemMovements.length === 0 ? (
-                <EmptyState icon="ti-history-off" title="Sin movimientos" subtitle="Este equipo no tiene movimientos registrados" />
+                <EmptyState
+                  icon="ti-history-off"
+                  title="Sin movimientos"
+                  subtitle="Este equipo no tiene movimientos registrados"
+                />
               ) : (
                 <div className="inventario-modal-table-container">
                   <table className="inventario-modal-table">
@@ -811,7 +1130,9 @@ export default function InventarioView({ bodegas = [], materiales = [], ots = []
             </div>
 
             <div className="inventario-modal-footer">
-              <Btn onClick={() => setShowMovementsModal(false)}>Cerrar</Btn>
+              <Btn onClick={() => setShowMovementsModal(false)}>
+                Cerrar
+              </Btn>
             </div>
           </div>
         </div>

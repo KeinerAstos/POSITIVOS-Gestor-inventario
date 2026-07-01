@@ -5,6 +5,24 @@ const { verifyToken } = require('./middleware/auth');
 
 const app = express();
 
+// ── DEBUG TEMPORAL ─────────────────────────────────
+const routesToCheck = [
+  ['./routes/bodegas',     'bodegas'],
+  ['./routes/inventario',  'inventario'],
+  ['./routes/movimientos', 'movimientos'],
+  ['./routes/ot',          'ot'],
+  ['./routes/usuarios',    'usuarios'],
+  ['./routes/materiales',  'materiales'],
+  ['./routes/auth',        'auth'],
+  ['./routes/actas-qa',    'actas-qa'],
+  ['./routes/salidas',     'salidas'],
+];
+routesToCheck.forEach(([path, name]) => {
+  const mod = require(path);
+  console.log(`[${name}] tipo: ${typeof mod}, esRouter: ${typeof mod === 'function'}`);
+});
+// ── FIN DEBUG ───────────────────────────────────────
+
 const authRoutes = require('./routes/auth');
 const actasQaRoutes = require('./routes/actas-qa');
 
@@ -14,6 +32,9 @@ app.use(express.json());
 
 const salidasRouter = require('./routes/salidas');
 app.use('/api/salidas', verifyToken, salidasRouter); // ✅ ahora verifyToken existe
+
+const consumosRoutes = require('./routes/consumos');
+app.use('/api/consumos', consumosRoutes);
 
 // ── Rutas ────────────────────────────────────────────
 app.use('/api/bodegas', require('./routes/bodegas'));

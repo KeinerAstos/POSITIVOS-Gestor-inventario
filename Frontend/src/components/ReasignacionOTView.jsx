@@ -1,192 +1,447 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { http } from '../api.js';
-import { Card, CardHeader, Btn, Alert, Label, PageHeader, DropdownList } from './UI.jsx';
+import { Btn, Alert, Label, PageHeader } from './UI.jsx';
 import '../styles/ReasignacionOTView.css';
 
+const ESTADOS_BODEGA = ['STOCK', 'INGRESADO'];
+
+const norm = (v) => String(v ?? '').trim().toLowerCase();
+const estadoOk = (v) => ESTADOS_BODEGA.includes(String(v || '').toUpperCase());
+
 export default function ReasignacionOTView({ inv = [], ots = [], refresh }) {
-  const [equipos, setEquipos] = useState([{ buscar: '', id: null, desc: '', serial: '', ot_actual_numero: '' }]);
-  const [materiales, setMateriales] = useState([{ inventario_id: '', cantidad: 1, disponible: 0, ot_actual_numero: '' }]);
+  const [otOrigen, setOtOrigen] = useState('');
+  const [otOrigenId, setOtOrigenId] = useState(null);
+  const [showOrigenDrop, setShowOrigenDrop] = useState(false);
+
   const [otDestino, setOtDestino] = useState('');
   const [otDestinoId, setOtDestinoId] = useState(null);
   const [otDestinoInfo, setOtDestinoInfo] = useState(null);
-  const [showOtDrop, setShowOtDrop] = useState(false);
+  const [showDestinoDrop, setShowDestinoDrop] = useState(false);
+
   const [nuevoOth, setNuevoOth] = useState('');
   const [observacion, setObservacion] = useState('');
+  const [selectedEquipoIds, setSelectedEquipoIds] = useState([]);
+  const [materialRows, setMaterialRows] = useState([]);
   const [saving, setSaving] = useState(false);
   const [alert, setAlert] = useState(null);
-  const [activeDD, setActiveDD] = useState(null);
 
-  const equiposConOT = useMemo(() => inv.filter(i => i.serial && i.ot_id !== null && (i.estado === 'STOCK' || i.estado === 'INGRESADO')), [inv]);
-  const materialesConOT = useMemo(() => inv.filter(i => !i.serial && i.cantidad > 0 && (i.estado === 'INGRESADO' || i.estado === 'STOCK')), [inv]);
+  const otsConInventario = useMemo(() => {
+    const resumen = new Map();
 
-  const filteredOTs = useMemo(() => {
-    if (!otDestino.trim()) return [];
-    const t = otDestino.toLowerCase();
-    return ots.filter(o => (o.numero_ot||'').toLowerCase().includes(t) || (o.cliente||'').toLowerCase().includes(t)).slice(0, 8);
-  }, [otDestino, ots]);
+    inv.forEach((item) => {
+      if (!item.ot_id || !estadoOk(item.estado)) return;
 
-  useEffect(() => {
-    const fn = e => { if (e.key === 'Escape') { setActiveDD(null); setShowOtDrop(false); } };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, []);
+      const id = Number(item.ot_id);
+      const actual = resumen.get(id) || { equipos: 0, materiales: 0, cantidad: 0 };
 
-  const handleSubmit = async () => {
-    const ids = equipos.filter(e => e.id).map(e => e.id);
-    const mats = materiales.filter(m => m.inventario_id);
-    if (!ids.length && !mats.length) { setAlert({ type: 'error', msg: 'Selecciona al menos un elemento.' }); return; }
-    if (!otDestinoId) { setAlert({ type: 'error', msg: 'Selecciona una OT destino.' }); return; }
-    setSaving(true); setAlert(null);
-    try {
-      const uid = window.CURRENT_USER_ID || 1;
-      for (const id of ids) await http.post('/inventario/reasignar-ot', { inventario_id: id, ot_destino: otDestinoId, oth: nuevoOth || null, usuario_id: uid, observacion: observacion || 'Reasignación entre OT' });
-      for (const mat of mats) await http.post('/inventario/reasignar-ot', { inventario_id: parseInt(mat.inventario_id), ot_destino: otDestinoId, oth: nuevoOth || null, usuario_id: uid, observacion: observacion || 'Reasignación de material', cantidad: mat.cantidad });
-      await refresh();
-      setEquipos([{ buscar: '', id: null, desc: '', serial: '', ot_actual_numero: '' }]);
-      setMateriales([{ inventario_id: '', cantidad: 1, disponible: 0, ot_actual_numero: '' }]);
-      setOtDestino(''); setOtDestinoId(null); setOtDestinoInfo(null); setNuevoOth(''); setObservacion('');
-      setAlert({ type: 'success', msg: 'Reasignación completada correctamente.' });
-    } catch (err) { setAlert({ type: 'error', msg: err.message }); }
-    finally { setSaving(false); }
+      if (item.serial) actual.equipos += 1;
+      else if (Number(item.cantidad || 0) > 0) {
+        actual.materiales += 1;
+        actual.cantidad += Number(item.cantidad || 0);
+      }
+
+      resumen.set(id, actual);
+    });
+
+    return ots
+      .filter((o) => resumen.has(Number(o.id)))
+      .map((o) => ({ ...o, _resumen: resumen.get(Number(o.id)) }));
+  }, [inv, ots]);
+
+  const filteredOrigenOTs = useMemo(() => {
+    const t = norm(otOrigen);
+    if (t.length < 2 || otOrigenId) return [];
+
+    return otsConInventario
+      .filter((o) =>
+        norm(o.numero_ot).includes(t) ||
+        norm(o.cliente).includes(t) ||
+        norm(o.destino).includes(t)
+      )
+      .slice(0, 8);
+  }, [otOrigen, otOrigenId, otsConInventario]);
+
+  const filteredDestinoOTs = useMemo(() => {
+    const t = norm(otDestino);
+    if (t.length < 2 || otDestinoId) return [];
+
+    return ots
+      .filter((o) =>
+        Number(o.id) !== Number(otOrigenId) &&
+        (
+          norm(o.numero_ot).includes(t) ||
+          norm(o.cliente).includes(t) ||
+          norm(o.destino).includes(t)
+        )
+      )
+      .slice(0, 8);
+  }, [otDestino, otDestinoId, ots, otOrigenId]);
+
+  const itemsOrigen = useMemo(() => {
+    if (!otOrigenId) return [];
+
+    return inv.filter((i) =>
+      Number(i.ot_id) === Number(otOrigenId) &&
+      estadoOk(i.estado) &&
+      (i.serial || Number(i.cantidad || 0) > 0)
+    );
+  }, [inv, otOrigenId]);
+
+  const equiposOrigen = useMemo(() => itemsOrigen.filter((i) => i.serial), [itemsOrigen]);
+  const materialesOrigen = useMemo(() => itemsOrigen.filter((i) => !i.serial && Number(i.cantidad || 0) > 0), [itemsOrigen]);
+
+  const selectedMaterialRows = useMemo(() => materialRows.filter((m) => m.selected), [materialRows]);
+
+  const totalCantidadMaterial = useMemo(() => {
+    return selectedMaterialRows.reduce((acc, m) => acc + Number(m.cantidad || 0), 0);
+  }, [selectedMaterialRows]);
+
+  const seleccionarOrigen = (ot) => {
+    const origenItems = inv.filter((i) =>
+      Number(i.ot_id) === Number(ot.id) &&
+      estadoOk(i.estado) &&
+      (i.serial || Number(i.cantidad || 0) > 0)
+    );
+
+    const equipos = origenItems.filter((i) => i.serial);
+    const materiales = origenItems.filter((i) => !i.serial && Number(i.cantidad || 0) > 0);
+
+    setOtOrigen(ot.numero_ot || `OT #${ot.id}`);
+    setOtOrigenId(ot.id);
+    setShowOrigenDrop(false);
+    setSelectedEquipoIds(equipos.map((i) => i.id));
+    setMaterialRows(materiales.map((m) => ({
+      id: m.id,
+      selected: true,
+      cantidad: Number(m.cantidad || 1),
+      disponible: Number(m.cantidad || 1),
+    })));
+    setAlert(null);
   };
 
+  const limpiarOrigen = () => {
+    setOtOrigen('');
+    setOtOrigenId(null);
+    setShowOrigenDrop(false);
+    setSelectedEquipoIds([]);
+    setMaterialRows([]);
+  };
+
+  const seleccionarDestino = (ot) => {
+    setOtDestino(ot.numero_ot || `OT #${ot.id}`);
+    setOtDestinoId(ot.id);
+    setOtDestinoInfo(ot);
+    setShowDestinoDrop(false);
+  };
+
+  const limpiarDestino = () => {
+    setOtDestino('');
+    setOtDestinoId(null);
+    setOtDestinoInfo(null);
+    setShowDestinoDrop(false);
+  };
+
+  const toggleEquipo = (id) => {
+    setSelectedEquipoIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleTodosEquipos = () => {
+    if (selectedEquipoIds.length === equiposOrigen.length) setSelectedEquipoIds([]);
+    else setSelectedEquipoIds(equiposOrigen.map((i) => i.id));
+  };
+
+  const toggleMaterial = (id) => {
+    setMaterialRows((prev) => prev.map((m) =>
+      m.id === id ? { ...m, selected: !m.selected } : m
+    ));
+  };
+
+  const toggleTodosMateriales = () => {
+    const todos = materialRows.length > 0 && materialRows.every((m) => m.selected);
+    setMaterialRows((prev) => prev.map((m) => ({ ...m, selected: !todos })));
+  };
+
+  const cambiarCantidadMaterial = (id, value) => {
+    setMaterialRows((prev) => prev.map((m) => {
+      if (m.id !== id) return m;
+      const next = Math.max(1, Math.min(Number(value || 1), Number(m.disponible || 1)));
+      return { ...m, cantidad: next };
+    }));
+  };
+
+  const handleSubmit = async () => {
+    const ids = selectedEquipoIds;
+    const mats = selectedMaterialRows;
+
+    if (!otOrigenId) return setAlert({ type: 'error', msg: 'Selecciona la OT origen.' });
+    if (!otDestinoId) return setAlert({ type: 'error', msg: 'Selecciona la OT destino.' });
+    if (Number(otOrigenId) === Number(otDestinoId)) return setAlert({ type: 'error', msg: 'La OT destino no puede ser igual a la OT origen.' });
+    if (!ids.length && !mats.length) return setAlert({ type: 'error', msg: 'Selecciona al menos un equipo o material.' });
+
+    setSaving(true);
+    setAlert(null);
+
+    try {
+      const uid = window.CURRENT_USER_ID || 1;
+
+      for (const id of ids) {
+        await http.post('/inventario/reasignar-ot', {
+          inventario_id: id,
+          ot_destino: otDestinoId,
+          oth: nuevoOth || null,
+          usuario_id: uid,
+          observacion: observacion || 'Reasignación entre OT',
+        });
+      }
+
+      for (const mat of mats) {
+        await http.post('/inventario/reasignar-ot', {
+          inventario_id: Number(mat.id),
+          ot_destino: otDestinoId,
+          oth: nuevoOth || null,
+          usuario_id: uid,
+          observacion: observacion || 'Reasignación de material',
+          cantidad: Number(mat.cantidad || 1),
+        });
+      }
+
+      await refresh();
+      limpiarOrigen();
+      limpiarDestino();
+      setNuevoOth('');
+      setObservacion('');
+      setAlert({ type: 'success', msg: 'Reasignación completada correctamente.' });
+    } catch (err) {
+      setAlert({ type: 'error', msg: err.message || 'Error realizando la reasignación.' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderOtOption = (o) => (
+    <button type="button" key={o.id} className="rot-option" onMouseDown={(e) => e.preventDefault()} onClick={() => seleccionarOrigen(o)}>
+      <div>
+        <strong>{o.numero_ot || `OT #${o.id}`}</strong>
+        <span>{o.cliente || 'Sin cliente'}{o.destino ? ` · ${o.destino}` : ''}</span>
+      </div>
+      <div className="rot-option-meta">
+        <span>{o._resumen?.equipos || 0} eq</span>
+        <span>{o._resumen?.materiales || 0} mat</span>
+      </div>
+    </button>
+  );
+
   return (
-    <div className="reasignacion-fade-in">
+    <div className="rot-page">
       <PageHeader title="Reasignar entre OT" icon="ti-switch-horizontal" subtitle="Mueve equipos y materiales de una OT a otra" />
+
       {alert && <Alert type={alert.type} msg={alert.msg} onClose={() => setAlert(null)} />}
-      <div className="reasignacion-container">
-        {/* OT Destino */}
-        <Card>
-          <CardHeader title="OT Destino" icon="ti-file-invoice" />
-          <div className="reasignacion-card-body">
-            <div className="reasignacion-ot-destino">
-              <Label required>Buscar OT destino</Label>
-              <div className="reasignacion-input-wrapper">
-                <input
-                  className={`reasignacion-input ${otDestinoId ? 'reasignacion-input-success' : ''}`}
-                  value={otDestino}
-                  onChange={e => { setOtDestino(e.target.value); setShowOtDrop(true); setOtDestinoId(null); setOtDestinoInfo(null); }}
-                  placeholder="Número de OT o cliente..."
-                  onFocus={() => setShowOtDrop(true)}
-                />
-                {otDestino && (
-                  <button className="reasignacion-clear-btn" onClick={() => { setOtDestino(''); setOtDestinoId(null); setOtDestinoInfo(null); }}>
-                    ×
-                  </button>
-                )}
-              </div>
-              <DropdownList
-                items={showOtDrop ? filteredOTs : []}
-                onSelect={o => { setOtDestino(o.numero_ot || `OT #${o.id}`); setOtDestinoId(o.id); setOtDestinoInfo(o); setShowOtDrop(false); }}
-                renderItem={o => (
-                  <div className="reasignacion-dropdown-item">
-                    <div>
-                      <strong className="reasignacion-dropdown-title">{o.numero_ot}</strong>
-                      <div className="reasignacion-dropdown-subtitle">{o.cliente}</div>
-                    </div>
-                    <span className={`reasignacion-estado-badge ${o.estado === 'ABIERTA' ? 'reasignacion-estado-abierta' : 'reasignacion-estado-cerrada'}`}>
-                      {o.estado}
-                    </span>
-                  </div>
-                )}
+
+      <section className="rot-panel rot-hero">
+        <div className="rot-panel-head">
+          <div>
+            <h3>Datos de reasignación</h3>
+            <p>Selecciona una OT origen con inventario disponible, define la OT destino y confirma los elementos a mover.</p>
+          </div>
+          <div className="rot-kpis">
+            <span>{selectedEquipoIds.length} equipos</span>
+            <span>{selectedMaterialRows.length} materiales</span>
+            <span>{totalCantidadMaterial} unidades</span>
+          </div>
+        </div>
+
+        <div className="rot-form-grid">
+          <div className="rot-field rot-search-field">
+            <Label required>OT origen</Label>
+            <div className="rot-input-icon">
+              <i className="ti ti-file-search" />
+              <input
+                value={otOrigen}
+                onChange={(e) => {
+                  setOtOrigen(e.target.value);
+                  setOtOrigenId(null);
+                  setSelectedEquipoIds([]);
+                  setMaterialRows([]);
+                  setShowOrigenDrop(true);
+                }}
+                onFocus={() => setShowOrigenDrop(true)}
+                placeholder="Buscar por número de OT, cliente o destino..."
               />
+              {otOrigen && <button type="button" onClick={limpiarOrigen}>×</button>}
             </div>
-            {otDestinoInfo && (
-              <div className="reasignacion-ot-info">
-                <strong className="reasignacion-ot-info-title">{otDestinoInfo.numero_ot}</strong> · {otDestinoInfo.cliente} · {otDestinoInfo.destino || 'Sin destino'}
+
+            {showOrigenDrop && filteredOrigenOTs.length > 0 && (
+              <div className="rot-dropdown">
+                {filteredOrigenOTs.map(renderOtOption)}
               </div>
             )}
-            <div className="reasignacion-field">
-              <Label>Nuevo OTH (opcional)</Label>
-              <input className="reasignacion-input" value={nuevoOth} onChange={e => setNuevoOth(e.target.value)} placeholder="Número OTH si cambia..." />
+          </div>
+
+          <div className="rot-field rot-search-field">
+            <Label required>OT destino</Label>
+            <div className="rot-input-icon">
+              <i className="ti ti-file-invoice" />
+              <input
+                value={otDestino}
+                onChange={(e) => {
+                  setOtDestino(e.target.value);
+                  setOtDestinoId(null);
+                  setOtDestinoInfo(null);
+                  setShowDestinoDrop(true);
+                }}
+                onFocus={() => setShowDestinoDrop(true)}
+                placeholder="Buscar por número de OT, cliente o destino..."
+              />
+              {otDestino && <button type="button" onClick={limpiarDestino}>×</button>}
+            </div>
+
+            {showDestinoDrop && filteredDestinoOTs.length > 0 && (
+              <div className="rot-dropdown">
+                {filteredDestinoOTs.map((o) => (
+                  <button type="button" key={o.id} className="rot-option" onMouseDown={(e) => e.preventDefault()} onClick={() => seleccionarDestino(o)}>
+                    <div>
+                      <strong>{o.numero_ot || `OT #${o.id}`}</strong>
+                      <span>{o.cliente || 'Sin cliente'}{o.destino ? ` · ${o.destino}` : ''}</span>
+                    </div>
+                    <div className="rot-status-pill">{o.estado || 'OT'}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rot-field">
+            <Label>Nuevo OTH</Label>
+            <div className="rot-input-icon">
+              <i className="ti ti-hash" />
+              <input value={nuevoOth} onChange={(e) => setNuevoOth(e.target.value)} placeholder="Opcional si cambia..." />
             </div>
           </div>
-        </Card>
+        </div>
 
-        {/* Equipos serializados */}
-        <Card>
-          <CardHeader title="Equipos serializados" icon="ti-barcode" subtitle={`${equipos.filter(e => e.id).length} seleccionados`} />
-          <div className="reasignacion-card-body">
-            <div className="reasignacion-equipos-list">
-              {equipos.map((eq, idx) => {
-                const matches = eq.buscar.trim().length > 1 ? equiposConOT.filter(i => (i.serial||'').toLowerCase().includes(eq.buscar.toLowerCase())).slice(0, 6) : [];
+        {(otOrigenId || otDestinoInfo) && (
+          <div className="rot-route">
+            <div><span>Origen</span><strong>{otOrigen || 'Sin seleccionar'}</strong></div>
+            <i className="ti ti-arrow-right" />
+            <div><span>Destino</span><strong>{otDestinoInfo?.numero_ot || otDestino || 'Sin seleccionar'}</strong></div>
+          </div>
+        )}
+      </section>
+
+      <section className="rot-panel">
+        <div className="rot-section-title">
+          <div>
+            <i className="ti ti-barcode" />
+            <div>
+              <h3>Equipos serializados</h3>
+              <p>{selectedEquipoIds.length} de {equiposOrigen.length} seleccionados</p>
+            </div>
+          </div>
+        </div>
+
+        {!otOrigenId && <div className="rot-empty">Selecciona una OT origen para cargar los equipos.</div>}
+        {otOrigenId && equiposOrigen.length === 0 && <div className="rot-empty">La OT origen no tiene equipos serializados disponibles.</div>}
+
+        {equiposOrigen.length > 0 && (
+          <div className="rot-table-wrap">
+            <div className="rot-table rot-equipment-table">
+              <div className="rot-tr rot-th">
+                <div><input type="checkbox" checked={selectedEquipoIds.length === equiposOrigen.length} onChange={toggleTodosEquipos} /></div>
+                <div>Código SAP</div>
+                <div>Descripción</div>
+                <div>Serial</div>
+                <div>Estado</div>
+                <div>Ubicación</div>
+              </div>
+              {equiposOrigen.map((i) => {
+                const checked = selectedEquipoIds.includes(i.id);
                 return (
-                  <div key={idx} className="reasignacion-equipo-item">
-                    <div className="reasignacion-equipo-search">
-                      <input
-                        className={`reasignacion-input ${eq.id ? 'reasignacion-input-warning' : ''}`}
-                        style={eq.id ? { background: 'rgba(249,115,22,0.05)' } : {}}
-                        value={eq.buscar}
-                        onChange={e => { const n = [...equipos]; n[idx] = { buscar: e.target.value, id: null, desc: '', serial: '', ot_actual_numero: '' }; setEquipos(n); setActiveDD(`req_${idx}`); }}
-                        placeholder="Buscar por serie..."
-                        onFocus={() => setActiveDD(`req_${idx}`)}
-                      />
-                      <DropdownList
-                        items={activeDD === `req_${idx}` ? matches : []}
-                        onSelect={item => { const n = [...equipos]; n[idx] = { buscar: item.serial, id: item.id, desc: item.descripcion||item.material_id, serial: item.serial, ot_actual_numero: item.numero_ot||`OT #${item.ot_id}` }; setEquipos(n); setActiveDD(null); }}
-                        renderItem={item => (
-                          <div>
-                            <strong className="reasignacion-mono">{item.serial}</strong>
-                            <div className="reasignacion-dropdown-subtitle">{item.descripcion} · OT: {item.numero_ot}</div>
-                          </div>
-                        )}
-                      />
-                    </div>
-                    {eq.id && (
-                      <div className="reasignacion-equipo-preview">
-                        <div className="reasignacion-equipo-preview-title">{eq.desc}</div>
-                        <div className="reasignacion-equipo-preview-ot">OT actual: {eq.ot_actual_numero}</div>
-                      </div>
-                    )}
-                    <button className="reasignacion-remove-btn" onClick={() => { if (equipos.length === 1) setEquipos([{ buscar: '', id: null, desc: '', serial: '', ot_actual_numero: '' }]); else setEquipos(equipos.filter((_, i) => i !== idx)); }}>×</button>
-                  </div>
+                  <label key={i.id} className={`rot-tr rot-td ${checked ? 'is-selected' : ''}`}>
+                    <div><input type="checkbox" checked={checked} onChange={() => toggleEquipo(i.id)} /></div>
+                    <div className="rot-strong">{i.material_id || '-'}</div>
+                    <div title={i.descripcion || i.material_descripcion || ''}>{i.descripcion || i.material_descripcion || '-'}</div>
+                    <div className="rot-mono">{i.serial || '-'}</div>
+                    <div><span className={`rot-badge rot-badge-${String(i.estado || '').toLowerCase()}`}>{i.estado || '-'}</span></div>
+                    <div>{i.ubicacion || 'Sin ubicación'}</div>
+                  </label>
                 );
               })}
             </div>
-            <button className="reasignacion-add-btn" onClick={() => setEquipos(p => [...p, { buscar: '', id: null, desc: '', serial: '', ot_actual_numero: '' }])}>+ Agregar equipo</button>
           </div>
-        </Card>
+        )}
+      </section>
 
-        {/* Materiales no serializados */}
-        <Card>
-          <CardHeader title="Materiales no serializados" icon="ti-package" />
-          <div className="reasignacion-card-body">
-            <div className="reasignacion-materiales-list">
-              {materiales.map((mat, idx) => (
-                <div key={idx} className="reasignacion-material-item">
-                  <select
-                    className="reasignacion-select"
-                    value={mat.inventario_id}
-                    onChange={e => { const n = [...materiales]; n[idx].inventario_id = e.target.value; const f = materialesConOT.find(m => m.id === parseInt(e.target.value)); n[idx].disponible = f?.cantidad || 0; n[idx].ot_actual_numero = f?.numero_ot || ''; setMateriales(n); }}
-                  >
-                    <option value="">Seleccionar material...</option>
-                    {materialesConOT.map(m => <option key={m.id} value={m.id}>{m.descripcion||m.material_id} (OT: {m.numero_ot||m.ot_id}, Stock: {m.cantidad})</option>)}
-                  </select>
-                  <input
-                    type="number"
-                    className="reasignacion-number-input"
-                    value={mat.cantidad}
-                    min={1}
-                    max={mat.disponible||1}
-                    onChange={e => { const n = [...materiales]; n[idx].cantidad = Math.min(parseInt(e.target.value)||1, n[idx].disponible||1); setMateriales(n); }}
-                  />
-                  <button className="reasignacion-remove-btn" onClick={() => { if (materiales.length === 1) setMateriales([{ inventario_id: '', cantidad: 1, disponible: 0, ot_actual_numero: '' }]); else setMateriales(materiales.filter((_, i) => i !== idx)); }}>×</button>
-                </div>
-              ))}
+      <section className="rot-panel">
+        <div className="rot-section-title">
+          <div>
+            <i className="ti ti-package" />
+            <div>
+              <h3>Materiales no serializados</h3>
+              <p>{selectedMaterialRows.length} de {materialesOrigen.length} seleccionados · {totalCantidadMaterial} unidades</p>
             </div>
-            <button className="reasignacion-add-btn" onClick={() => setMateriales(p => [...p, { inventario_id: '', cantidad: 1, disponible: 0, ot_actual_numero: '' }])}>+ Agregar material</button>
           </div>
-        </Card>
+        </div>
 
-        {/* Observación + submit */}
-        <Card>
-          <div className="reasignacion-card-body">
-            <Label>Observación</Label>
-            <textarea className="reasignacion-textarea" value={observacion} onChange={e => setObservacion(e.target.value)} placeholder="Motivo de la reasignación..." />
-            <Btn onClick={handleSubmit} loading={saving} icon="ti-switch-horizontal" className="reasignacion-submit-btn">Confirmar Reasignación</Btn>
+        {!otOrigenId && <div className="rot-empty">Selecciona una OT origen para cargar los materiales.</div>}
+        {otOrigenId && materialesOrigen.length === 0 && <div className="rot-empty">La OT origen no tiene materiales disponibles.</div>}
+
+        {materialesOrigen.length > 0 && (
+          <div className="rot-table-wrap">
+            <div className="rot-table rot-material-table">
+              <div className="rot-tr rot-th">
+                <div><input type="checkbox" checked={materialRows.length > 0 && materialRows.every((m) => m.selected)} onChange={toggleTodosMateriales} /></div>
+                <div>Código SAP</div>
+                <div>Descripción</div>
+                <div>Disponible</div>
+                <div>A reasignar</div>
+                <div>Estado</div>
+                <div>Ubicación</div>
+              </div>
+              {materialesOrigen.map((i) => {
+                const row = materialRows.find((m) => m.id === i.id) || { selected: false, cantidad: 1, disponible: i.cantidad };
+                return (
+                  <label key={i.id} className={`rot-tr rot-td ${row.selected ? 'is-selected' : ''}`}>
+                    <div><input type="checkbox" checked={row.selected} onChange={() => toggleMaterial(i.id)} /></div>
+                    <div className="rot-strong">{i.material_id || '-'}</div>
+                    <div title={i.descripcion || i.material_descripcion || ''}>{i.descripcion || i.material_descripcion || '-'}</div>
+                    <div><span className="rot-qty">{i.cantidad || 0}</span></div>
+                    <div>
+                      <input
+                        className="rot-qty-input"
+                        type="number"
+                        min="1"
+                        max={row.disponible || 1}
+                        disabled={!row.selected}
+                        value={row.cantidad}
+                        onChange={(e) => cambiarCantidadMaterial(i.id, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div><span className={`rot-badge rot-badge-${String(i.estado || '').toLowerCase()}`}>{i.estado || '-'}</span></div>
+                    <div>{i.ubicacion || 'Sin ubicación'}</div>
+                  </label>
+                );
+              })}
+            </div>
           </div>
-        </Card>
-      </div>
+        )}
+      </section>
+
+      <section className="rot-panel rot-footer-panel">
+        <div className="rot-field">
+          <Label>Observación</Label>
+          <textarea value={observacion} onChange={(e) => setObservacion(e.target.value)} placeholder="Motivo de la reasignación..." />
+        </div>
+        <div className="rot-summary">
+          <div><span>Origen</span><strong>{otOrigen || 'Sin seleccionar'}</strong></div>
+          <div><span>Destino</span><strong>{otDestino || 'Sin seleccionar'}</strong></div>
+          <Btn onClick={handleSubmit} loading={saving} icon="ti-switch-horizontal" disabled={saving}>
+            Confirmar Reasignación
+          </Btn>
+        </div>
+      </section>
     </div>
   );
 }
