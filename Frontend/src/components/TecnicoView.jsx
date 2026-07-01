@@ -52,17 +52,27 @@ export default function TecnicoView({ user, token, refresh: refreshParent }) {
     finally { setLoadingActas(false); }
   };
 
-  const descargarPDF = async (id) => {
-    try {
-      const res = await fetch(`/api/actas-qa/${id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `acta_${id}.pdf`;
-      a.click();
-    } catch { alert('Error al descargar PDF'); }
-  };
+  const descargarDOCX = async (id) => {
+  try {
+    const res = await fetch(`/api/actas-qa/${id}/docx`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.detail || e.error || 'Error al descargar DOCX');
+    }
+
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `acta_${id}.docx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (err) {
+    alert(err.message);
+  }
+};
 
   useEffect(() => {
     cargarFormatosQa();
@@ -255,15 +265,17 @@ export default function TecnicoView({ user, token, refresh: refreshParent }) {
                     return (
                       <tr key={acta.id}>
                         <td className="mono" style={{ fontSize: 12 }}>#{acta.id}</td>
+                        <td>{acta.nombre_formato || acta.tipo_formato || 'Acta QA'}</td>
                         <td>{fmtFecha(acta.fecha_ejecucion)}</td>
                         <td style={{ color: 'var(--text-muted)' }}>{fmtFecha(acta.created_at)}</td>
                         <td>{acta.lugar_instalacion || '—'}</td>
-                        <td>{acta.nombre_formato || acta.tipo_formato || 'Acta QA'}</td>
                         <td>
                           <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: `${color}18`, color, border: `1px solid ${color}30` }}>{estado}</span>
                         </td>
                         <td>
-                          <Btn variant="ghost" size="sm" onClick={() => descargarPDF(acta.id)} icon="ti-file-description">PDF</Btn>
+                          <Btn variant="ghost" size="sm" onClick={() => descargarDOCX(acta.id)} icon="ti-file-type-docx">
+                            DOCX
+                          </Btn>
                         </td>
                       </tr>
                     );

@@ -10,7 +10,13 @@ const SECTION = ({ title, icon, children }) => (
 );
 
 const GRID = ({ cols = 2, children }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: 14 }}>
+  <div
+    style={{
+      display: 'grid',
+      gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+      gap: 14,
+    }}
+  >
     {children}
   </div>
 );
@@ -22,6 +28,294 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
+const EMPTY_EQ = {
+  sap: '',
+  descripcion: '',
+  serial: '',
+  placa: '',
+  tipo: '',
+  marca: '',
+  modelo: '',
+  ubicacion: '',
+};
+
+function getOptionValue(opt) {
+  if (opt && typeof opt === 'object') return opt.value;
+  return opt;
+}
+
+function getOptionLabel(opt) {
+  if (opt && typeof opt === 'object') return opt.label || opt.value;
+  return opt;
+}
+
+function isTriStateField(campo) {
+  const options = campo?.options || [];
+  const values = options.map(opt => String(getOptionValue(opt) || '').trim().toUpperCase());
+
+  return (
+    values.includes('SI') &&
+    values.includes('NO') &&
+    (values.includes('N/A') || values.includes('NA'))
+  );
+}
+
+function normalizeTriStateValue(value) {
+  const text = String(value || '').trim().toUpperCase();
+
+  if (text === 'SI' || text === 'SÍ') return 'SI';
+  if (text === 'NO') return 'NO';
+  if (text === 'NA' || text === 'N/A' || text === 'NO APLICA') return 'N/A';
+
+  return 'N/A';
+}
+
+function shouldRenderAsImageField(campo) {
+  const key = String(campo?.key || '').toLowerCase();
+  const label = String(campo?.label || '').toLowerCase();
+  const type = String(campo?.type || '').toLowerCase();
+
+  // La forma correcta y prioritaria: el schema define type: 'image'
+  if (['image', 'photo', 'foto', 'file'].includes(type)) return true;
+
+  // Compatibilidad con campos antiguos de evidencia/foto.
+  // OJO: no ponemos "firmados" aquí porque puede confundir un select SI/NO/N/A con imagen.
+  return (
+    key.startsWith('foto_') ||
+    key.includes('_foto_') ||
+    key.includes('imagen_') ||
+    key.includes('_imagen') ||
+    key.includes('escaneo') ||
+    key.includes('evidencia_imagen') ||
+    label.includes('foto') ||
+    label.includes('imagen') ||
+    label.includes('escaneo')
+  );
+}
+
+function buildInitialCamposExtra(schema) {
+  const initial = {};
+
+  (schema?.camposExtra || []).forEach(campo => {
+    if (campo.type === 'select' && isTriStateField(campo)) {
+      initial[campo.key] = 'N/A';
+    }
+
+    if (campo.type === 'checkbox') {
+      initial[campo.key] = false;
+    }
+
+    if (shouldRenderAsImageField(campo)) {
+      initial[campo.key] = '';
+    }
+  });
+
+  return initial;
+}
+
+function fileToResizedDataUrl(file, maxWidth = 1000, maxHeight = 800, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve('');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('Solo se permiten imágenes JPG, PNG o WEBP.'));
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const img = new Image();
+
+      img.onload = () => {
+        let { width, height } = img;
+
+        const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+
+        // Fondo blanco para evitar fondos negros/vinotinto cuando la imagen trae transparencia
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+
+      img.onerror = () => reject(new Error('No se pudo leer la imagen seleccionada.'));
+      img.src = reader.result;
+    };
+
+    reader.onerror = () => reject(new Error('No se pudo cargar el archivo.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function TablaEquipos({ items, onRemove }) {
+  if (!items.length) {
+    return (
+      <div
+        style={{
+          padding: '12px',
+          textAlign: 'center',
+          color: 'var(--text-muted)',
+          fontSize: 12,
+          background: 'rgba(255,255,255,0.02)',
+          borderRadius: 8,
+        }}
+      >
+        Sin equipos agregados. En el DOCX se diligenciará como N/A.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ overflowX: 'auto', marginTop: 10 }}>
+      <table>
+        <thead>
+          <tr>
+            {[
+              'Código SAP',
+              'Descripción',
+              'Serie',
+              'Placa',
+              'Tipo',
+              'Marca',
+              'Modelo',
+              'Ubicación',
+              '',
+            ].map(header => (
+              <th key={header}>{header}</th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {items.map((eq, index) => (
+            <tr key={`${eq.serial || 'eq'}-${index}`}>
+              <td className="mono" style={{ fontSize: 12 }}>{eq.sap}</td>
+              <td style={{ fontWeight: 500 }}>{eq.descripcion}</td>
+              <td className="mono" style={{ fontSize: 12 }}>{eq.serial}</td>
+              <td style={{ color: 'var(--text-muted)' }}>{eq.placa || '—'}</td>
+              <td>{eq.tipo || '—'}</td>
+              <td>{eq.marca || '—'}</td>
+              <td>{eq.modelo || '—'}</td>
+              <td>{eq.ubicacion || '—'}</td>
+              <td>
+                <button
+                  type="button"
+                  onClick={() => onRemove(index)}
+                  style={{
+                    background: 'rgba(239,68,68,0.12)',
+                    color: '#EF4444',
+                    border: '1px solid rgba(239,68,68,0.2)',
+                    borderRadius: 6,
+                    padding: '3px 10px',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                  }}
+                >
+                  ✕
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FilaManualEquipos({ val, setVal, onAdd }) {
+  const fields = [
+    ['sap', 'Código SAP'],
+    ['descripcion', 'Descripción'],
+    ['serial', 'Serie'],
+    ['placa', 'Placa'],
+    ['tipo', 'Tipo'],
+    ['marca', 'Marca'],
+    ['modelo', 'Modelo'],
+    ['ubicacion', 'Ubicación'],
+  ];
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        padding: '12px 14px',
+        background: 'rgba(255,255,255,0.02)',
+        borderRadius: 10,
+        border: '1px solid var(--border)',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--text-muted)',
+          marginBottom: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+        }}
+      >
+        Agregar manualmente
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+          gap: 8,
+          alignItems: 'end',
+        }}
+      >
+        {fields.map(([key, placeholder]) => (
+          <input
+            key={key}
+            value={val[key] || ''}
+            onChange={e => {
+              const value = e.target.value;
+              setVal(prev => ({
+                ...prev,
+                [key]: value,
+              }));
+            }}
+            placeholder={placeholder}
+          />
+        ))}
+
+        <button
+          type="button"
+          onClick={onAdd}
+          style={{
+            padding: '8px 16px',
+            background: 'rgba(217,119,6,0.15)',
+            color: 'var(--amber-glow)',
+            border: '1px solid rgba(217,119,6,0.3)',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          + Agregar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function FormularioActaQA({
   equiposAsignados = [],
   formatoQa,
@@ -29,7 +323,15 @@ export default function FormularioActaQA({
   onSuccess,
   onCancel,
 }) {
-  const schema = useMemo(() => getQaSchema(formatoQa?.id || 'qa_mpls'), [formatoQa?.id]);
+  const schema = useMemo(
+    () => getQaSchema(formatoQa?.id || 'qa_mpls'),
+    [formatoQa?.id]
+  );
+
+  const initialCamposExtra = useMemo(
+    () => buildInitialCamposExtra(schema),
+    [schema]
+  );
 
   const [form, setForm] = useState({
     tipo_formato: formatoQa?.id || 'qa_mpls',
@@ -39,72 +341,121 @@ export default function FormularioActaQA({
     fecha_ejecucion: new Date().toISOString().split('T')[0],
     hora_inicio: '',
     hora_salida: '',
+
     tiempo_transporte: '',
     tiempo_antesala: '',
     tiempo_ejecucion: '',
     tiempo_espera_claro: '',
+
     ingeniero_outsourcing: '',
     multimetro: '',
     analizador_ber: '',
     soporte_claro: '',
+
     firma_acta: false,
     caso_seguimiento: false,
     problemas_instalacion: false,
-    mediciones_electricas: { fase_neutro: '', fase_tierra: '', neutro_tierra: '' },
+
+    mediciones_electricas: {
+      fase_neutro: '',
+      fase_tierra: '',
+      neutro_tierra: '',
+    },
+
     lugar_instalacion: 'RACK',
     observaciones: '',
-    pruebas_servicio: { ping_central: '', traceroute: '', firmware: '' },
+
+    pruebas_servicio: {
+      ping_central: '',
+      traceroute: '',
+      firmware: '',
+    },
+
     equipos_instalados: [],
     equipos_desinstalados: [],
     fotos: [],
-    campos_extra: {},
+    campos_extra: initialCamposExtra,
   });
 
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(null);
   const [eqSel, setEqSel] = useState('');
 
-  const EMPTY_EQ = { sap: '', descripcion: '', serial: '', placa: '', tipo: '', marca: '', modelo: '', ubicacion: '' };
   const [nuevoInst, setNuevoInst] = useState({ ...EMPTY_EQ });
   const [nuevoDesinst, setNuevoDesinst] = useState({ ...EMPTY_EQ });
 
-  const showSection = (sectionKey) => schema?.secciones?.includes(sectionKey);
+  const showSection = (sectionKey) => {
+    return schema?.secciones?.includes(sectionKey);
+  };
 
   const set = (key) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setForm(p => ({ ...p, [key]: value }));
+
+    setForm(prev => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
-  const setMed = (k, v) => {
-    setForm(p => ({
-      ...p,
-      mediciones_electricas: { ...p.mediciones_electricas, [k]: v },
+  const setMed = (key, value) => {
+    setForm(prev => ({
+      ...prev,
+      mediciones_electricas: {
+        ...prev.mediciones_electricas,
+        [key]: value,
+      },
     }));
   };
 
   const setExtra = (key, value) => {
-    setForm(p => ({
-      ...p,
+    setForm(prev => ({
+      ...prev,
       campos_extra: {
-        ...p.campos_extra,
+        ...prev.campos_extra,
         [key]: value,
       },
     }));
   };
 
   const camposByGroup = (group) => {
-    return (schema?.camposExtra || []).filter(c => c.group === group);
+    return (schema?.camposExtra || []).filter(campo => campo.group === group);
+  };
+
+  const normalizeCamposExtraForSubmit = () => {
+    const next = {
+      ...(form.campos_extra || {}),
+    };
+
+    (schema?.camposExtra || []).forEach(campo => {
+      const currentValue = next[campo.key];
+
+      if (campo.type === 'select' && isTriStateField(campo)) {
+        next[campo.key] = normalizeTriStateValue(currentValue);
+      }
+
+      if (campo.type === 'checkbox' && currentValue === undefined) {
+        next[campo.key] = false;
+      }
+
+      if (shouldRenderAsImageField(campo) && currentValue === undefined) {
+        next[campo.key] = '';
+      }
+    });
+
+    return next;
   };
 
   const agregarDesdeLista = () => {
     if (!eqSel) return;
-    const eq = equiposAsignados.find(e => e.id === parseInt(eqSel, 10));
+
+    const eq = equiposAsignados.find(item => item.id === parseInt(eqSel, 10));
+
     if (!eq) return;
 
-    setForm(p => ({
-      ...p,
+    setForm(prev => ({
+      ...prev,
       equipos_instalados: [
-        ...p.equipos_instalados,
+        ...prev.equipos_instalados,
         {
           sap: eq.material_id || '',
           descripcion: eq.material_descripcion || eq.descripcion || '',
@@ -123,28 +474,56 @@ export default function FormularioActaQA({
 
   const agregarInst = () => {
     if (!nuevoInst.sap || !nuevoInst.descripcion || !nuevoInst.serial) {
-      setAlert({ type: 'error', msg: 'Completa SAP, Descripción y Serie.' });
+      setAlert({
+        type: 'error',
+        msg: 'Completa SAP, Descripción y Serie.',
+      });
       return;
     }
-    setForm(p => ({ ...p, equipos_instalados: [...p.equipos_instalados, { ...nuevoInst }] }));
+
+    setForm(prev => ({
+      ...prev,
+      equipos_instalados: [
+        ...prev.equipos_instalados,
+        { ...nuevoInst },
+      ],
+    }));
+
     setNuevoInst({ ...EMPTY_EQ });
   };
 
   const agregarDesinst = () => {
     if (!nuevoDesinst.sap || !nuevoDesinst.descripcion || !nuevoDesinst.serial) {
-      setAlert({ type: 'error', msg: 'Completa SAP, Descripción y Serie.' });
+      setAlert({
+        type: 'error',
+        msg: 'Completa SAP, Descripción y Serie.',
+      });
       return;
     }
-    setForm(p => ({ ...p, equipos_desinstalados: [...p.equipos_desinstalados, { ...nuevoDesinst }] }));
+
+    setForm(prev => ({
+      ...prev,
+      equipos_desinstalados: [
+        ...prev.equipos_desinstalados,
+        { ...nuevoDesinst },
+      ],
+    }));
+
     setNuevoDesinst({ ...EMPTY_EQ });
   };
 
-  const quitarInst = (i) => {
-    setForm(p => ({ ...p, equipos_instalados: p.equipos_instalados.filter((_, j) => j !== i) }));
+  const quitarInst = (index) => {
+    setForm(prev => ({
+      ...prev,
+      equipos_instalados: prev.equipos_instalados.filter((_, i) => i !== index),
+    }));
   };
 
-  const quitarDesinst = (i) => {
-    setForm(p => ({ ...p, equipos_desinstalados: p.equipos_desinstalados.filter((_, j) => j !== i) }));
+  const quitarDesinst = (index) => {
+    setForm(prev => ({
+      ...prev,
+      equipos_desinstalados: prev.equipos_desinstalados.filter((_, i) => i !== index),
+    }));
   };
 
   const validarFormulario = () => {
@@ -152,16 +531,20 @@ export default function FormularioActaQA({
       return 'Fecha de ejecución y hora de inicio son obligatorias.';
     }
 
+    const camposExtraNormalizados = normalizeCamposExtraForSubmit();
+
     const faltantes = (schema?.camposExtra || [])
       .filter(campo => campo.required)
       .filter(campo => {
-        const value = form.campos_extra?.[campo.key];
+        const value = camposExtraNormalizados?.[campo.key];
+
         if (typeof value === 'boolean') return false;
+
         return value === undefined || value === null || String(value).trim() === '';
       });
 
     if (faltantes.length > 0) {
-      return `Faltan campos obligatorios: ${faltantes.map(c => c.label).join(', ')}`;
+      return `Faltan campos obligatorios: ${faltantes.map(campo => campo.label).join(', ')}`;
     }
 
     return null;
@@ -169,8 +552,12 @@ export default function FormularioActaQA({
 
   const handleSubmit = async () => {
     const error = validarFormulario();
+
     if (error) {
-      setAlert({ type: 'error', msg: error });
+      setAlert({
+        type: 'error',
+        msg: error,
+      });
       return;
     }
 
@@ -178,51 +565,172 @@ export default function FormularioActaQA({
     setAlert(null);
 
     try {
+      const camposExtraNormalizados = normalizeCamposExtraForSubmit();
+
       const payload = {
         ...form,
         tipo_formato: formatoQa?.id || form.tipo_formato || 'qa_mpls',
         nombre_formato: formatoQa?.nombre || form.nombre_formato || 'Acta QA MPLS',
         archivo_formato: formatoQa?.archivo || form.archivo_formato || 'FOR Acta QA MPLS.docx',
-        campos_extra: form.campos_extra || {},
+        campos_extra: camposExtraNormalizados,
       };
 
       const res = await fetch('/api/actas-qa', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
-        throw new Error(e.error || 'Error al guardar el acta QA');
+        throw new Error(e.detail || e.error || 'Error al guardar el acta QA');
       }
 
       const data = await res.json();
 
-      const pdfRes = await fetch(`/api/actas-qa/${data.id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const docxRes = await fetch(`/api/actas-qa/${data.id}/docx`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
-      if (pdfRes.ok) {
-        const blob = await pdfRes.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `acta_${payload.tipo_formato}_${data.id}.pdf`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+      if (!docxRes.ok) {
+        const e = await docxRes.json().catch(() => ({}));
+        throw new Error(e.detail || e.error || 'El acta se guardó, pero no se pudo generar el DOCX.');
       }
 
-      setAlert({ type: 'success', msg: `Acta #${data.id} guardada y PDF descargado.` });
+      const blob = await docxRes.blob();
+      const a = document.createElement('a');
+
+      a.href = URL.createObjectURL(blob);
+      a.download = `acta_${payload.tipo_formato}_${data.id}.docx`;
+      a.click();
+
+      URL.revokeObjectURL(a.href);
+
+      setAlert({
+        type: 'success',
+        msg: `Acta #${data.id} guardada y DOCX descargado.`,
+      });
+
       setTimeout(() => onSuccess?.(), 1200);
     } catch (err) {
-      setAlert({ type: 'error', msg: err.message });
+      setAlert({
+        type: 'error',
+        msg: err.message,
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const DynamicField = ({ campo }) => {
-    const value = form.campos_extra?.[campo.key] ?? '';
+  const renderImageField = (campo, value) => {
+    return (
+      <Field label={campo.label} required={campo.required}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            padding: 12,
+            border: '1px dashed var(--border)',
+            borderRadius: 10,
+            background: 'rgba(255,255,255,0.02)',
+          }}
+        >
+          {value ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <img
+                src={value}
+                alt={campo.label}
+                style={{
+                  width: 160,
+                  height: 110,
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  background: 'white',
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => setExtra(campo.key, '')}
+                style={{
+                  background: 'rgba(239,68,68,0.12)',
+                  color: '#EF4444',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: 8,
+                  padding: '7px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Quitar imagen
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                color: 'var(--text-muted)',
+                fontSize: 12,
+              }}
+            >
+              Sin imagen cargada. Si queda vacío, el DOCX mostrará espacio reservado para evidencia fotográfica.
+            </div>
+          )}
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={async e => {
+              const file = e.target.files?.[0];
+
+              if (!file) return;
+
+              try {
+                const dataUrl = await fileToResizedDataUrl(file);
+                setExtra(campo.key, dataUrl);
+              } catch (err) {
+                setAlert({
+                  type: 'error',
+                  msg: err.message,
+                });
+              } finally {
+                e.target.value = '';
+              }
+            }}
+          />
+
+          <small style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+            Recomendado: foto horizontal, buena luz. La plataforma comprime la imagen antes de guardar.
+          </small>
+        </div>
+      </Field>
+    );
+  };
+
+  const renderDynamicField = (campo) => {
+    const rawValue = form.campos_extra?.[campo.key];
+
+    const value =
+      campo.type === 'select' && isTriStateField(campo)
+        ? normalizeTriStateValue(rawValue)
+        : rawValue ?? '';
+
+    if (shouldRenderAsImageField(campo)) {
+      return renderImageField(campo, value);
+    }
 
     if (campo.type === 'textarea') {
       return (
@@ -239,13 +747,30 @@ export default function FormularioActaQA({
     }
 
     if (campo.type === 'select') {
+      const options = campo.options || [];
+      const triState = isTriStateField(campo);
+
+      const normalizedOptions = triState
+        ? [
+            { value: 'N/A', label: 'N/A' },
+            ...options.filter(opt => String(getOptionValue(opt)).trim().toUpperCase() !== 'N/A'),
+          ]
+        : options;
+
       return (
         <Field label={campo.label} required={campo.required}>
-          <select value={value} onChange={e => setExtra(campo.key, e.target.value)}>
-            <option value="">-- Seleccionar --</option>
-            {(campo.options || []).map(opt => (
-              <option key={opt.value || opt} value={opt.value || opt}>
-                {opt.label || opt}
+          <select
+            value={triState ? normalizeTriStateValue(value) : value}
+            onChange={e => setExtra(campo.key, e.target.value)}
+          >
+            {!triState && <option value="">-- Seleccionar --</option>}
+
+            {normalizedOptions.map(opt => (
+              <option
+                key={getOptionValue(opt)}
+                value={getOptionValue(opt)}
+              >
+                {getOptionLabel(opt)}
               </option>
             ))}
           </select>
@@ -255,14 +780,23 @@ export default function FormularioActaQA({
 
     if (campo.type === 'checkbox') {
       return (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            cursor: 'pointer',
+            padding: '8px 14px',
+            borderRadius: 10,
+            border: '1px solid var(--border)',
+          }}
+        >
           <input
             type="checkbox"
-            checked={Boolean(value)}
+            checked={Boolean(form.campos_extra?.[campo.key])}
             onChange={e => setExtra(campo.key, e.target.checked)}
-            style={{ width: 'auto' }}
           />
-          <span style={{ fontSize: 13, fontWeight: 500 }}>{campo.label}</span>
+          <span>{campo.label}</span>
         </label>
       );
     }
@@ -279,99 +813,146 @@ export default function FormularioActaQA({
     );
   };
 
-  const RenderCamposExtra = ({ group, title, icon, cols = 2 }) => {
-    const campos = camposByGroup(group);
+  const renderCamposExtra = (grupo) => {
+    const campos = camposByGroup(grupo.key);
+
     if (!campos.length) return null;
 
     return (
-      <SECTION title={title} icon={icon}>
-        <GRID cols={cols}>
-          {campos.map(campo => <DynamicField key={campo.key} campo={campo} />)}
+      <SECTION title={grupo.title} icon={grupo.icon}>
+        <GRID cols={grupo.cols || 2}>
+          {campos.map(campo => (
+            <React.Fragment key={campo.key}>
+              {renderDynamicField(campo)}
+            </React.Fragment>
+          ))}
         </GRID>
       </SECTION>
     );
   };
 
-  const TablaEquipos = ({ items, onRemove }) => (
-    items.length === 0
-      ? <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>Sin equipos agregados</div>
-      : (
-        <div style={{ overflowX: 'auto', marginTop: 10 }}>
-          <table>
-            <thead>
-              <tr>
-                {['Código SAP', 'Descripción', 'Serie', 'Placa', 'Tipo', 'Marca', 'Modelo', 'Ubicación', ''].map(h => <th key={h}>{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((eq, i) => (
-                <tr key={i}>
-                  <td className="mono" style={{ fontSize: 12 }}>{eq.sap}</td>
-                  <td style={{ fontWeight: 500 }}>{eq.descripcion}</td>
-                  <td className="mono" style={{ fontSize: 12 }}>{eq.serial}</td>
-                  <td style={{ color: 'var(--text-muted)' }}>{eq.placa || '—'}</td>
-                  <td>{eq.tipo || '—'}</td>
-                  <td>{eq.marca || '—'}</td>
-                  <td>{eq.modelo || '—'}</td>
-                  <td>{eq.ubicacion || '—'}</td>
-                  <td>
-                    <button onClick={() => onRemove(i)} style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 12 }}>✕</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )
-  );
-
-  const FilaManual = ({ val, setVal, onAdd }) => (
-    <div style={{ marginTop: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px solid var(--border)' }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Agregar manualmente</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, alignItems: 'end' }}>
-        {[
-          ['sap', 'Código SAP'],
-          ['descripcion', 'Descripción'],
-          ['serial', 'Serie'],
-          ['placa', 'Placa'],
-          ['tipo', 'Tipo'],
-          ['marca', 'Marca'],
-          ['modelo', 'Modelo'],
-          ['ubicacion', 'Ubicación'],
-        ].map(([k, ph]) => (
-          <input key={k} value={val[k]} onChange={e => setVal(p => ({ ...p, [k]: e.target.value }))} placeholder={ph} />
-        ))}
-        <button onClick={onAdd} style={{ padding: '8px 16px', background: 'rgba(217,119,6,0.15)', color: 'var(--amber-glow)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: 8, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}>+ Agregar</button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="fade-in" style={{ maxWidth: 980, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 24,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(217,119,6,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(217,119,6,0.25)' }}>
-            <i className={`ti ${formatoQa?.icon || 'ti-clipboard-check'}`} style={{ fontSize: 22, color: 'var(--amber-glow)' }} />
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: 'rgba(217,119,6,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(217,119,6,0.25)',
+            }}
+          >
+            <i
+              className={`ti ${formatoQa?.icon || 'ti-clipboard-check'}`}
+              style={{
+                fontSize: 22,
+                color: 'var(--amber-glow)',
+              }}
+            />
           </div>
+
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>{formatoQa?.nombre || 'Nueva Acta QA'}</h2>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{formatoQa?.descripcion || 'Formulario dinámico de calidad'}</p>
+            <h2
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+              }}
+            >
+              {formatoQa?.nombre || 'Nueva Acta QA'}
+            </h2>
+
+            <p
+              style={{
+                fontSize: 13,
+                color: 'var(--text-muted)',
+                marginTop: 2,
+              }}
+            >
+              {formatoQa?.descripcion || 'Formulario dinámico de calidad'}
+            </p>
           </div>
         </div>
-        <Btn variant="secondary" onClick={onCancel} icon="ti-x">Cancelar</Btn>
+
+        <Btn variant="secondary" onClick={onCancel} icon="ti-x">
+          Cancelar
+        </Btn>
       </div>
 
-      {alert && <Alert type={alert.type} msg={alert.msg} onClose={() => setAlert(null)} />}
+      {alert && (
+        <Alert
+          type={alert.type}
+          msg={alert.msg}
+          onClose={() => setAlert(null)}
+        />
+      )}
 
       {showSection('datos_generales') && (
         <SECTION title="Datos Generales" icon="ti-file-text">
           <GRID cols={2}>
-            <Field label="Fecha de ejecución" required><input type="date" value={form.fecha_ejecucion} onChange={set('fecha_ejecucion')} /></Field>
-            <Field label="Lugar de instalación"><select value={form.lugar_instalacion} onChange={set('lugar_instalacion')}><option value="RACK">RACK</option><option value="PISO">PISO</option><option value="PARED">PARED</option><option value="OTRO">OTRO</option></select></Field>
-            <Field label="Hora inicio" required><input type="time" value={form.hora_inicio} onChange={set('hora_inicio')} /></Field>
-            <Field label="Hora salida"><input type="time" value={form.hora_salida} onChange={set('hora_salida')} /></Field>
-            <Field label="Ingeniero outsourcing"><input value={form.ingeniero_outsourcing} onChange={set('ingeniero_outsourcing')} placeholder="Nombre del ingeniero" /></Field>
-            <Field label="Soporte Claro"><input value={form.soporte_claro} onChange={set('soporte_claro')} placeholder="Nombre contacto Claro" /></Field>
+            <Field label="Fecha de ejecución" required>
+              <input
+                type="date"
+                value={form.fecha_ejecucion}
+                onChange={set('fecha_ejecucion')}
+              />
+            </Field>
+
+            <Field label="Lugar de instalación">
+              <select
+                value={form.lugar_instalacion}
+                onChange={set('lugar_instalacion')}
+              >
+                <option value="RACK">RACK</option>
+                <option value="PISO">PISO</option>
+                <option value="PARED">PARED</option>
+                <option value="OTRO">OTRO</option>
+              </select>
+            </Field>
+
+            <Field label="Hora inicio" required>
+              <input
+                type="time"
+                value={form.hora_inicio}
+                onChange={set('hora_inicio')}
+              />
+            </Field>
+
+            <Field label="Hora salida">
+              <input
+                type="time"
+                value={form.hora_salida}
+                onChange={set('hora_salida')}
+              />
+            </Field>
+
+            <Field label="Ingeniero outsourcing">
+              <input
+                value={form.ingeniero_outsourcing}
+                onChange={set('ingeniero_outsourcing')}
+                placeholder="Nombre del ingeniero"
+              />
+            </Field>
+
+            <Field label="Soporte Claro">
+              <input
+                value={form.soporte_claro}
+                onChange={set('soporte_claro')}
+                placeholder="Nombre contacto Claro"
+              />
+            </Field>
           </GRID>
         </SECTION>
       )}
@@ -384,8 +965,16 @@ export default function FormularioActaQA({
               ['tiempo_antesala', 'Antesala'],
               ['tiempo_ejecucion', 'Ejecución'],
               ['tiempo_espera_claro', 'Espera Claro'],
-            ].map(([k, l]) => (
-              <Field key={k} label={l}><input type="number" min="0" value={form[k]} onChange={set(k)} placeholder="0" /></Field>
+            ].map(([key, label]) => (
+              <Field key={key} label={label}>
+                <input
+                  type="number"
+                  min="0"
+                  value={form[key]}
+                  onChange={set(key)}
+                  placeholder="0"
+                />
+              </Field>
             ))}
           </GRID>
         </SECTION>
@@ -394,8 +983,21 @@ export default function FormularioActaQA({
       {showSection('equipos_medicion') && (
         <SECTION title="Equipos de Medición" icon="ti-ruler-measure">
           <GRID cols={2}>
-            <Field label="Multímetro"><input value={form.multimetro} onChange={set('multimetro')} placeholder="Modelo / ID" /></Field>
-            <Field label="Analizador BER"><input value={form.analizador_ber} onChange={set('analizador_ber')} placeholder="Modelo / ID" /></Field>
+            <Field label="Multímetro">
+              <input
+                value={form.multimetro}
+                onChange={set('multimetro')}
+                placeholder="Modelo / ID"
+              />
+            </Field>
+
+            <Field label="Analizador BER">
+              <input
+                value={form.analizador_ber}
+                onChange={set('analizador_ber')}
+                placeholder="Modelo / ID"
+              />
+            </Field>
           </GRID>
         </SECTION>
       )}
@@ -407,9 +1009,15 @@ export default function FormularioActaQA({
               ['fase_neutro', 'Fase — Neutro (V)'],
               ['fase_tierra', 'Fase — Tierra (V)'],
               ['neutro_tierra', 'Neutro — Tierra (V)'],
-            ].map(([k, l]) => (
-              <Field key={k} label={l}>
-                <input type="number" step="0.01" value={form.mediciones_electricas[k]} onChange={e => setMed(k, e.target.value)} placeholder="0.00" />
+            ].map(([key, label]) => (
+              <Field key={key} label={label}>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.mediciones_electricas[key]}
+                  onChange={e => setMed(key, e.target.value)}
+                  placeholder="0.00"
+                />
               </Field>
             ))}
           </GRID>
@@ -419,65 +1027,180 @@ export default function FormularioActaQA({
       {showSection('equipos_instalados') && (
         <SECTION title="Equipos Instalados" icon="ti-package-import">
           {equiposAsignados.length > 0 && (
-            <div style={{ marginBottom: 16, padding: '12px 14px', background: 'rgba(34,197,94,0.06)', borderRadius: 10, border: '1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#22C55E', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Agregar desde mis equipos asignados</div>
+            <div
+              style={{
+                marginBottom: 16,
+                padding: '12px 14px',
+                background: 'rgba(34,197,94,0.06)',
+                borderRadius: 10,
+                border: '1px solid rgba(34,197,94,0.15)',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: '#22C55E',
+                  marginBottom: 8,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                Agregar desde mis equipos asignados
+              </div>
+
               <div style={{ display: 'flex', gap: 8 }}>
-                <select value={eqSel} onChange={e => setEqSel(e.target.value)} style={{ flex: 1 }}>
+                <select
+                  value={eqSel}
+                  onChange={e => setEqSel(e.target.value)}
+                  style={{ flex: 1 }}
+                >
                   <option value="">-- Seleccionar equipo --</option>
+
                   {equiposAsignados.map(eq => (
-                    <option key={eq.id} value={eq.id}>{eq.serial ? `${eq.serial} — ` : ''}{eq.material_descripcion || eq.descripcion || eq.material_id} ({eq.estado})</option>
+                    <option key={eq.id} value={eq.id}>
+                      {eq.serial ? `${eq.serial} — ` : ''}
+                      {eq.material_descripcion || eq.descripcion || eq.material_id}
+                      {eq.estado ? ` (${eq.estado})` : ''}
+                    </option>
                   ))}
                 </select>
-                <Btn variant="success" size="sm" onClick={agregarDesdeLista} disabled={!eqSel} icon="ti-plus">Agregar</Btn>
+
+                <Btn
+                  variant="success"
+                  size="sm"
+                  onClick={agregarDesdeLista}
+                  disabled={!eqSel}
+                  icon="ti-plus"
+                >
+                  Agregar
+                </Btn>
               </div>
             </div>
           )}
-          <TablaEquipos items={form.equipos_instalados} onRemove={quitarInst} />
-          <FilaManual val={nuevoInst} setVal={setNuevoInst} onAdd={agregarInst} />
+
+          <TablaEquipos
+            items={form.equipos_instalados}
+            onRemove={quitarInst}
+          />
+
+          <FilaManualEquipos
+            val={nuevoInst}
+            setVal={setNuevoInst}
+            onAdd={agregarInst}
+          />
         </SECTION>
       )}
 
       {showSection('equipos_desinstalados') && (
         <SECTION title="Equipos Desinstalados / Trasladados" icon="ti-package-export">
-          <TablaEquipos items={form.equipos_desinstalados} onRemove={quitarDesinst} />
-          <FilaManual val={nuevoDesinst} setVal={setNuevoDesinst} onAdd={agregarDesinst} />
+          <TablaEquipos
+            items={form.equipos_desinstalados}
+            onRemove={quitarDesinst}
+          />
+
+          <FilaManualEquipos
+            val={nuevoDesinst}
+            setVal={setNuevoDesinst}
+            onAdd={agregarDesinst}
+          />
         </SECTION>
       )}
 
       {(schema?.grupos || []).map(grupo => (
-        <RenderCamposExtra
-          key={grupo.key}
-          group={grupo.key}
-          title={grupo.title}
-          icon={grupo.icon}
-          cols={grupo.cols || 2}
-        />
+        <React.Fragment key={grupo.key}>
+          {renderCamposExtra(grupo)}
+        </React.Fragment>
       ))}
 
       {showSection('observaciones_cierre') && (
         <SECTION title="Observaciones y Cierre" icon="ti-notes">
           <Field label="Observaciones">
-            <textarea value={form.observaciones} onChange={set('observaciones')} rows={4} placeholder="Describe novedades, problemas, aclaraciones..." style={{ resize: 'vertical' }} />
+            <textarea
+              value={form.observaciones}
+              onChange={set('observaciones')}
+              rows={4}
+              placeholder="Describe novedades, problemas, aclaraciones..."
+              style={{ resize: 'vertical' }}
+            />
           </Field>
 
-          <div style={{ marginTop: 16, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              marginTop: 16,
+              display: 'flex',
+              gap: 20,
+              flexWrap: 'wrap',
+            }}
+          >
             {[
               ['firma_acta', 'Firma acta', '#22C55E'],
               ['caso_seguimiento', 'Caso seguimiento', '#F97316'],
               ['problemas_instalacion', 'Problemas instalación', '#EF4444'],
-            ].map(([k, l, c]) => (
-              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 14px', borderRadius: 10, border: `1px solid ${form[k] ? c + '40' : 'var(--border)'}`, background: form[k] ? `${c}10` : 'transparent', transition: 'all 0.15s' }}>
-                <input type="checkbox" checked={form[k]} onChange={set(k)} style={{ width: 'auto', accentColor: c }} />
-                <span style={{ fontSize: 13, fontWeight: 500, color: form[k] ? c : 'var(--text-secondary)' }}>{l}</span>
+            ].map(([key, label, color]) => (
+              <label
+                key={key}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '8px 14px',
+                  borderRadius: 10,
+                  border: `1px solid ${form[key] ? color + '40' : 'var(--border)'}`,
+                  background: form[key] ? `${color}10` : 'transparent',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form[key]}
+                  onChange={set(key)}
+                  style={{
+                    width: 'auto',
+                    accentColor: color,
+                  }}
+                />
+
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: form[key] ? color : 'var(--text-secondary)',
+                  }}
+                >
+                  {label}
+                </span>
               </label>
             ))}
           </div>
         </SECTION>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingBottom: 32 }}>
-        <Btn variant="secondary" onClick={onCancel} icon="ti-x">Cancelar</Btn>
-        <Btn onClick={handleSubmit} loading={loading} icon="ti-file-check" size="lg">Guardar y Generar PDF</Btn>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 12,
+          paddingBottom: 32,
+        }}
+      >
+        <Btn
+          variant="secondary"
+          onClick={onCancel}
+          icon="ti-x"
+        >
+          Cancelar
+        </Btn>
+
+        <Btn
+          onClick={handleSubmit}
+          loading={loading}
+          icon="ti-file-type-docx"
+          size="lg"
+        >
+          Guardar y Descargar DOCX
+        </Btn>
       </div>
     </div>
   );
